@@ -241,15 +241,15 @@ df_post_de_ganados = df_post_f_unique[df_post_f_unique["origen_deal_id"].isin(id
 # Cálculos
 w_count = df_origen_ganados["origen_deal_id"].nunique()
 w_post_count = df_post_de_ganados["deal_id"].nunique()
-# Suma de meses de duración en lugar de monto
-w_duracion_total = df_origen_ganados["origen_duracion_meses"].sum()
+# Suma de monto USD marketing (Confirmado certeza)
+w_amount_usd = df_origen_ganados["origen_amount"].sum()
 
 st.subheader("🏆 Impacto Comercial (Origen Ganado)")
 c_imp1, c_imp2, c_imp3 = st.columns(3)
 
 with c_imp1: display_kpi("Deals Ganados (Mkt)", f"{w_count}", "Cierre Ganado")
-with c_imp2: display_kpi("Duración Total Contratada", f"{w_duracion_total:,.1f}", "Suma Meses (Ganados)")
-with c_imp3: display_kpi("Derivados Comerciales", f"{w_post_count}", "Deals generados")
+with c_imp2: display_kpi("Monto Ganado (USD)", f"${w_amount_usd:,.2f}", "Total Pipeline Marketing")
+with c_imp3: display_kpi("Negocios posteriores creados", f"{w_post_count}", "Deals generados")
 
 st.markdown("---")
 
@@ -276,17 +276,30 @@ if not df_origen_f.empty:
         .reset_index(name="num_deals")
         .sort_values("num_deals", ascending=False)
     )
+    
+    # Obtener el valor máximo para ajustar la escala del eje Y
+    max_val = etapa_counts["num_deals"].max()
+    
     fig_etapas = px.bar(
         etapa_counts, x="etapa_marketing", y="num_deals",
         text="num_deals",
         color_discrete_sequence=[COLOR_PALETTE[0]]
     )
-    # Corrección para que el texto se ajuste automáticamente
-    fig_etapas.update_traces(textposition='auto', cliponaxis=False)
+    
+    # CORRECCIÓN DE ETIQUETAS: Posición fuera y color visible
+    fig_etapas.update_traces(
+        textposition='outside', 
+        textfont=dict(color='white'),
+        cliponaxis=False
+    )
     
     fig_etapas.update_layout(
-        xaxis_title="Etapa", yaxis_title="Deals",
-        template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)"
+        xaxis_title="Etapa", 
+        yaxis_title="Deals",
+        template="plotly_dark", 
+        plot_bgcolor="rgba(0,0,0,0)",
+        # Dar un 20% extra de margen arriba para que quepa el número
+        yaxis=dict(range=[0, max_val * 1.2]) 
     )
     st.plotly_chart(fig_etapas, use_container_width=True)
 else:
