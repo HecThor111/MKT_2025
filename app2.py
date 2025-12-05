@@ -72,9 +72,7 @@ def clasificar_estado_etapa(etapa: str) -> str:
     """Clasifica una etapa textual en: Ganado / Perdido / Descartado / Abierto."""
     if not isinstance(etapa, str):
         return "Abierto"
-
     e = etapa.lower()
-
     if "ganad" in e or "closed won" in e or "cierre ganado" in e:
         return "Ganado"
     if "perd" in e or "lost" in e or "closed lost" in e or "cierre perdido" in e:
@@ -101,10 +99,10 @@ PIPE_UNIDAD_FALLBACK = {
 }
 
 
-def normalizar_unidad(unidad: str, pipeline: str) -> str:
+def normalizar_unidad(unidad, pipeline) -> str:
     """Normaliza la unidad de negocio al catálogo (Cloud & AI / D&A / Enterprise)."""
-    u = (unidad or "").strip()
-    p = (pipeline or "").strip()
+    u = str(unidad or "").strip()
+    p = str(pipeline or "").strip()
 
     if not u or u == "Sin dato":
         return PIPE_UNIDAD_FALLBACK.get(p, "Sin dato")
@@ -295,28 +293,24 @@ total_post_amount = df_post_f_unique["deal_amount"].sum()
 deals_post_por_origen = num_post_unicos / num_origen if num_origen > 0 else 0
 
 with col1:
-    with st.container():
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Negocios totales en iNBest.marketing", f"{num_origen:,}")
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.metric("Negocios totales en iNBest.marketing", f"{num_origen:,}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with col2:
-    with st.container():
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Negocios posteriores únicos asociados", f"{num_post_unicos:,}")
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.metric("Negocios posteriores únicos asociados", f"{num_post_unicos:,}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with col3:
-    with st.container():
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Monto posterior total (USD/MXN)", f"{total_post_amount:,.2f}")
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.metric("Monto posterior total (USD/MXN)", f"{total_post_amount:,.2f}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with col4:
-    with st.container():
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Negocios posteriores por negocio de marketing", f"{deals_post_por_origen:.2f}")
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.metric("Negocios posteriores por negocio de marketing", f"{deals_post_por_origen:.2f}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # --- Negocios por etapa (SQL, MQL, Localizando, etc)
 st.markdown("#### 📍 Negocios de marketing por etapa")
@@ -387,7 +381,6 @@ st.markdown("### 🧠 Métricas avanzadas (solo ganados en marketing)")
 
 col5, col6, col7, col8 = st.columns(4)
 
-# Conversión: GANADOS con al menos 1 posterior
 agg_post_g = (
     df_post_from_g.groupby("origen_deal_id")["deal_id"]
     .nunique()
@@ -573,7 +566,7 @@ with col_time2:
 st.markdown("---")
 
 # -------------------------
-# MIX DE MARKETING POR UNIDAD / PRODUCTO
+# MIX DE MARKETING POR UNIDAD / ORIGEN
 # -------------------------
 st.subheader("🥧 Mix del pipeline iNBest.marketing")
 
@@ -599,28 +592,25 @@ with col_mix1:
     else:
         st.info("No hay negocios de marketing con los filtros actuales.")
 
+# En vez de producto catálogo (que viene vacío), usamos origen_del_negocio
 with col_mix2:
-    st.markdown("**Distribución de negocios de marketing por producto catálogo**")
+    st.markdown("**Distribución de negocios de marketing por origen del negocio**")
     if not df_origen_f.empty:
-        if (df_origen_f["origen_producto_catalogo"] == "Sin dato").all():
-            st.info("No hay datos de producto catálogo para los negocios de marketing.")
-        else:
-            mix_prod = (
-                df_origen_f[df_origen_f["origen_producto_catalogo"] != "Sin dato"]
-                .groupby("origen_producto_catalogo")["origen_deal_id"]
-                .nunique()
-                .reset_index(name="num_deals")
-                .sort_values("num_deals", ascending=False)
-            )
-            fig_mix_prod = px.pie(
-                mix_prod,
-                names="origen_producto_catalogo",
-                values="num_deals",
-                hole=0.3,
-                template=PLOT_TEMPLATE,
-            )
-            fig_mix_prod.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-            st.plotly_chart(fig_mix_prod, use_container_width=True)
+        mix_origen = (
+            df_origen_f.groupby("origen_origen_del_negocio")["origen_deal_id"]
+            .nunique()
+            .reset_index(name="num_deals")
+            .sort_values("num_deals", ascending=False)
+        )
+        fig_mix_origen = px.pie(
+            mix_origen,
+            names="origen_origen_del_negocio",
+            values="num_deals",
+            hole=0.3,
+            template=PLOT_TEMPLATE,
+        )
+        fig_mix_origen.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_mix_origen, use_container_width=True)
     else:
         st.info("No hay negocios de marketing con los filtros actuales.")
 
@@ -648,7 +638,6 @@ else:
                 "estado_marketing",
                 "origen_origen_del_negocio",
                 "origen_unidad_norm",
-                "origen_producto_catalogo",
                 "origen_amount",
                 "origen_duracion_meses",
             ],
@@ -748,7 +737,7 @@ with col_g2:
 st.markdown("---")
 
 # -------------------------
-# SANKEY: ORIGEN_DEL_NEGOCIO → UNIDAD_DE_NEGOCIO_ASIGNADA
+# SANKEY
 # -------------------------
 st.subheader("🔀 Flujo: Origen del negocio (marketing) → Unidad de negocio asignada (posterior)")
 
@@ -918,4 +907,3 @@ else:
             use_container_width=True,
             hide_index=True,
         )
-
