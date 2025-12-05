@@ -280,7 +280,7 @@ c_imp1, c_imp2, c_imp3 = st.columns(3)
 
 with c_imp1: display_kpi("Deals Ganados (Mkt)", f"{w_count}", "Cierre Ganado")
 with c_imp2: display_kpi("Monto Ganado (USD)", f"${w_amount_usd:,.2f}", "Total Pipeline Marketing")
-with c_imp3: display_kpi("Negocios posteriores creados", f"{val_kpi_posterior:,.1f}", "Suma Duración (Meses)")
+with c_imp3: display_kpi("Negocios posteriores creados", f"{val_kpi_posterior:,.1f}", "Suma Negocios Posteriores")
 
 st.markdown("---")
 
@@ -611,3 +611,4 @@ else:
         )
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
+
