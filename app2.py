@@ -14,44 +14,52 @@ st.set_page_config(
     layout="wide",
 )
 
-# ---- Estilo futurista / tech (oscuro + azules) ----
+# ---- Estilos globales (look futurista) ----
 st.markdown(
     """
     <style>
-    [data-testid="stAppViewContainer"] {
-        background: radial-gradient(circle at top, #020617 0, #000000 55%);
-        color: #e2f3ff;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #020617;
-        color: #e2f3ff;
-    }
-    h1, h2, h3, h4 {
-        color: #e2f3ff;
-    }
-    .css-1q8dd3e, .css-10trblm {
-        color: #e2f3ff;
-    }
+        .main {
+            background: radial-gradient(circle at top, #020617 0, #020617 40%, #000 100%);
+        }
+        [data-testid="stHeader"] {
+            background: linear-gradient(90deg, #020617, #020617);
+        }
+        h1, h2, h3, h4 {
+            color: #e5f2ff !important;
+        }
+        .stMarkdown, .stCaption, .stText {
+            color: #e2e8f0 !important;
+        }
+        [data-testid="stMetric"] {
+            background: linear-gradient(135deg, #020617 0%, #02101f 40%, #020617 100%);
+            border-radius: 999px;
+            padding: 0.4rem 1.2rem;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }
+        [data-testid="stMetricLabel"] {
+            color: #cbd5f5 !important;
+            font-size: 0.85rem;
+        }
+        [data-testid="stMetricValue"] {
+            color: #f9fafb !important;
+            font-size: 1.8rem;
+        }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.title("📊 HubSpot – Marketing → Negocios posteriores (2025)")
-st.caption(f"Origen de datos: {CSV_FILE}")
+# Paleta para las gráficas
+COLOR_SEQ = ["#38bdf8", "#0ea5e9", "#6366f1", "#22d3ee", "#8b5cf6", "#ec4899"]
+px.defaults.template = "plotly_dark"
+px.defaults.color_discrete_sequence = COLOR_SEQ
 
 
 # -------------------------
 # HELPERS
 # -------------------------
 def clasificar_estado_etapa(etapa: str) -> str:
-    """
-    Clasifica una etapa textual en:
-    - Ganado
-    - Perdido
-    - Descartado
-    - Abierto
-    """
+    """Clasifica la etapa textual en Ganado / Perdido / Descartado / Abierto."""
     if not isinstance(etapa, str):
         return "Abierto"
 
@@ -67,28 +75,38 @@ def clasificar_estado_etapa(etapa: str) -> str:
     return "Abierto"
 
 
-def style_fig(fig):
-    """Aplicar tema oscuro + azul a las gráficas."""
-    fig.update_layout(
-        template="plotly_dark",
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font_color="#e2f3ff",
-        legend=dict(bgcolor="rgba(0,0,0,0)"),
-    )
-    return fig
+def _safe_str(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, float) and np.isnan(v):
+        return ""
+    return str(v)
 
 
-# Mapear nombres "técnicos" de unidades a nombres de negocio
-UNIT_LABELS = {
-    "iNBest.Cloud": "Cloud & AI Solutions",
-    "iNBest.Data&Analytics": "Data & Analytics",
-    "iNBest.Enterprises": "Enterprise Solutions",
-    # si vienen ya con estos nombres, se respetan
-    "Cloud & AI Solutions": "Cloud & AI Solutions",
-    "Data & Analytics": "Data & Analytics",
-    "Enterprise Solutions": "Enterprise Solutions",
-}
+def normalizar_unidad(unidad_raw, pipeline_label) -> str:
+    """
+    Normaliza unidades de negocio a:
+    - Cloud & AI Solutions
+    - Data & Analytics
+    - Enterprise Solutions
+    Si no matchea nada, usa el texto original o 'Sin unidad'.
+    """
+    u = _safe_str(unidad_raw).strip()
+    p = _safe_str(pipeline_label).strip()
+    base = (u or p).lower()
+
+    if any(k in base for k in ["cloud", "aws", "ai "]):
+        return "Cloud & AI Solutions"
+    if any(k in base for k in ["data", "analytics"]):
+        return "Data & Analytics"
+    if any(k in base for k in ["enterprise", "enterprises", "usa", "calls", "government", "pdm"]):
+        return "Enterprise Solutions"
+
+    if u:
+        return u
+    if p:
+        return p
+    return "Sin unidad"
 
 
 # -------------------------
@@ -145,17 +163,29 @@ def load_data(path: str) -> pd.DataFrame:
         if col in df.columns:
             df[col] = df[col].fillna("Sin dato").astype(str)
 
-    # Monedas
+    # Monedas + versión normalizada
     for col in ["origen_currency", "deal_currency"]:
-        if col in df.columns:
-            df[col] = df[col].fillna("Sin moneda").astype(str)
+        if col not in df.columns:
+            df[col] = "Sin moneda"
+        df[col] = df[col].fillna("Sin moneda").astype(str)
 
-    # Unidades de negocio "bonitas"
-    df["origen_unidad_display"] = df["origen_unidad_de_negocio_asignada"].replace(
-        UNIT_LABELS
+    df["origen_currency_norm"] = df["origen_currency"].str.upper().str.strip()
+    df["deal_currency_norm"] = df["deal_currency"].str.upper().str.strip()
+
+    # Unidades de negocio normalizadas
+    df["origen_unidad_norm"] = df.apply(
+        lambda r: normalizar_unidad(
+            r.get("origen_unidad_de_negocio_asignada"),
+            r.get("origen_pipeline_label"),
+        ),
+        axis=1,
     )
-    df["deal_unidad_display"] = df["deal_unidad_de_negocio_asignada"].replace(
-        UNIT_LABELS
+    df["deal_unidad_norm"] = df.apply(
+        lambda r: normalizar_unidad(
+            r.get("deal_unidad_de_negocio_asignada"),
+            r.get("deal_pipeline_label"),
+        ),
+        axis=1,
     )
 
     return df
@@ -173,7 +203,6 @@ if df.empty:
 df_origen = df[df["tipo_negocio"] == "origen_marketing"].copy()
 df_post = df[df["tipo_negocio"] == "posterior_contacto"].copy()
 
-# Versión deduplicada por negocio (para métricas más limpias)
 df_origen_unique = (
     df_origen.sort_values("origen_created_date")
     .drop_duplicates(subset=["origen_deal_id"])
@@ -186,11 +215,10 @@ df_post_unique = (
 )
 
 # -------------------------
-# SIDEBAR – FILTROS
+# SIDEBAR – FILTROS (versión útil, sin complicar)
 # -------------------------
 st.sidebar.header("🎛️ Filtros")
 
-# Rango de fechas del negocio origen (usando negocios únicos)
 min_date = df_origen_unique["origen_created_date"].min()
 max_date = df_origen_unique["origen_created_date"].max()
 
@@ -199,7 +227,7 @@ if pd.isna(min_date) or pd.isna(max_date):
     st.stop()
 
 date_range = st.sidebar.date_input(
-    "Rango de creación del negocio de marketing",
+    "Rango de fecha (creación del negocio marketing)",
     value=(min_date.date(), max_date.date()),
 )
 
@@ -208,37 +236,33 @@ if isinstance(date_range, tuple) and len(date_range) == 2:
 else:
     start_date, end_date = min_date.date(), max_date.date()
 
-# Filtro por unidad de negocio asignada (marketing)
-unidades_mkt = sorted(
-    df_origen_unique["origen_unidad_display"].replace({"": "Sin dato"}).unique()
-)
+# Filtro por unidad de negocio (normalizada)
+unidades_mkt = sorted(df_origen_unique["origen_unidad_norm"].unique())
 unidad_filter = st.sidebar.multiselect(
-    "Unidad de negocio (marketing)",
+    "Unidad de negocio marketing",
     options=unidades_mkt,
     default=unidades_mkt,
 )
 
-# Filtro por producto catálogo (marketing)
-productos_mkt = sorted(
-    df_origen_unique["origen_producto_catalogo"].replace({"": "Sin dato"}).unique()
-)
-producto_filter = st.sidebar.multiselect(
-    "Producto catálogo (marketing)",
-    options=productos_mkt,
-    default=productos_mkt,
+# Filtro por origen del negocio (lead source)
+origenes = sorted(df_origen_unique["origen_origen_del_negocio"].unique())
+origen_filter = st.sidebar.multiselect(
+    "Origen del negocio (marketing)",
+    options=origenes,
+    default=origenes,
 )
 
-# Aplicar filtros sobre los negocios de origen (unique)
+# Aplicar filtros sobre negocios de origen
 mask_origen = (
     (df_origen_unique["origen_created_date"].dt.date >= start_date)
     & (df_origen_unique["origen_created_date"].dt.date <= end_date)
-    & (df_origen_unique["origen_unidad_display"].isin(unidad_filter))
-    & (df_origen_unique["origen_producto_catalogo"].isin(producto_filter))
+    & (df_origen_unique["origen_unidad_norm"].isin(unidad_filter))
+    & (df_origen_unique["origen_origen_del_negocio"].isin(origen_filter))
 )
 
 df_origen_f = df_origen_unique[mask_origen].copy()
 
-# Filtrar también los posteriores en función de los origen filtrados
+# Filtrar posteriores ligados a esos negocios de marketing
 origen_ids_filtrados = df_origen_f["origen_deal_id"].astype(str).unique()
 df_post_f = df_post[df_post["origen_deal_id"].astype(str).isin(origen_ids_filtrados)].copy()
 df_post_f_unique = (
@@ -247,7 +271,7 @@ df_post_f_unique = (
     .copy()
 )
 
-# Subconjuntos de GANADOS en marketing
+# Subconjunto de GANADOS en marketing
 df_origen_g = df_origen_f[df_origen_f["estado_marketing"] == "Ganado"].copy()
 df_post_from_g = df_post_f[
     df_post_f["origen_deal_id"].isin(df_origen_g["origen_deal_id"])
@@ -259,48 +283,38 @@ df_post_from_g_unique = (
 )
 
 # -------------------------
-# MÉTRICAS GENERALES (fila 1)
+# TITULO
 # -------------------------
-st.markdown("### 🔢 KPIs generales del pipeline iNBest.marketing")
+st.title("🚀 HubSpot – Marketing → Negocios posteriores (2025)")
+st.caption(f"Origen de datos: {CSV_FILE}")
+
+# -------------------------
+# KPIs GENERALES
+# -------------------------
+st.markdown("## 🔢 Visión general del pipeline iNBest.marketing")
 
 col1, col2, col3, col4 = st.columns(4)
 
 num_origen = df_origen_f["origen_deal_id"].nunique()
 num_post_unicos = df_post_f_unique["deal_id"].nunique()
 
-# Montos posteriores por moneda (NO mezclamos USD + MXN)
-if "deal_currency" in df_post_f_unique.columns:
-    total_post_usd = df_post_f_unique.loc[
-        df_post_f_unique["deal_currency"] == "USD", "deal_amount"
-    ].sum()
-    total_post_mxn = df_post_f_unique.loc[
-        df_post_f_unique["deal_currency"] == "MXN", "deal_amount"
-    ].sum()
-else:
-    total_post_usd = np.nan
-    total_post_mxn = np.nan
+# Monto posterior separado por moneda
+total_post_usd = df_post_f_unique.loc[
+    df_post_f_unique["deal_currency_norm"] == "USD", "deal_amount"
+].sum()
+total_post_mxn = df_post_f_unique.loc[
+    df_post_f_unique["deal_currency_norm"].isin(["MXN", "MEX", "MX"]), "deal_amount"
+].sum()
 
 deals_post_por_origen = num_post_unicos / num_origen if num_origen > 0 else 0
 
-col1.metric("Negocios totales en iNBest.marketing", f"{num_origen:,}")
+col1.metric("Negocios de marketing en iNBest.marketing", f"{num_origen:,}")
 col2.metric("Negocios posteriores únicos asociados", f"{num_post_unicos:,}")
-
-if not np.isnan(total_post_usd):
-    col3.metric("Monto posterior total en USD", f"${total_post_usd:,.2f}")
-else:
-    col3.metric("Monto posterior total en USD", "N/A")
-
-if not np.isnan(total_post_mxn):
-    col4.metric("Monto posterior total en MXN", f"${total_post_mxn:,.2f}")
-else:
-    col4.metric("Monto posterior total en MXN", "N/A")
-
-st.caption(
-    f"💡 En promedio, cada negocio de marketing genera **{deals_post_por_origen:.2f}** negocios posteriores."
-)
+col3.metric("Monto posterior total en USD", f"${total_post_usd:,.2f}")
+col4.metric("Monto posterior total en MXN", f"${total_post_mxn:,.2f}")
 
 # --- Negocios por etapa (SQL, MQL, Localizando, etc)
-st.markdown("#### 📍 Negocios de marketing por etapa")
+st.markdown("### 📍 Negocios de marketing por etapa")
 if not df_origen_f.empty:
     etapa_counts = (
         df_origen_f.groupby("etapa_marketing")["origen_deal_id"]
@@ -312,14 +326,17 @@ if not df_origen_f.empty:
         etapa_counts,
         x="etapa_marketing",
         y="num_deals",
-        color_discrete_sequence=px.colors.sequential.Blues,
+        color="etapa_marketing",
+        color_discrete_sequence=COLOR_SEQ,
     )
     fig_etapas.update_layout(
         xaxis_title="Etapa de marketing",
-        yaxis_title="Núm. negocios",
+        yaxis_title="Número de negocios",
         margin=dict(l=10, r=10, t=30, b=80),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(15,23,42,0.9)",
+        showlegend=False,
     )
-    fig_etapas = style_fig(fig_etapas)
     st.plotly_chart(fig_etapas, use_container_width=True)
 else:
     st.info("No hay negocios de marketing con los filtros actuales.")
@@ -327,29 +344,28 @@ else:
 st.markdown("---")
 
 # -------------------------
-# PERFORMANCE DE NEGOCIOS GANADOS EN MARKETING
+# PERFORMANCE DE NEGOCIOS GANADOS
 # -------------------------
-st.markdown("### 🏆 Performance de negocios ganados en iNBest.marketing")
+st.markdown("## 🏆 Performance de negocios GANADOS en iNBest.marketing (USD)")
 
-# --- KPIs principales de ganados ---
-colg1, colg2, colg3 = st.columns(3)
-
+# Totales ganados
 num_origen_g = df_origen_g["origen_deal_id"].nunique()
-# Todos los montos de origen (marketing) están en USD
-total_origen_g_amount = df_origen_g["origen_amount"].sum()
+
+total_origen_g_usd = df_origen_g.loc[
+    df_origen_g["origen_currency_norm"] == "USD", "origen_amount"
+].sum()
+
 num_post_from_g_unicos = df_post_from_g_unique["deal_id"].nunique()
 
-colg1.metric("Negocios de marketing ganados", f"{num_origen_g:,}")
-colg2.metric("Monto ganado en marketing (USD)", f"${total_origen_g_amount:,.2f}")
-colg3.metric(
-    "Negocios posteriores vinculados a ganados",
-    f"{num_post_from_g_unicos:,}",
+total_post_from_g_usd = df_post_from_g_unique.loc[
+    df_post_from_g_unique["deal_currency_norm"] == "USD", "deal_amount"
+].sum()
+
+roi_factor_g = (
+    total_post_from_g_usd / total_origen_g_usd if total_origen_g_usd > 0 else np.nan
 )
 
-# --- Métricas avanzadas sobre esos ganados ---
-col5, col6, col7 = st.columns(3)
-
-# GANADOS con al menos 1 posterior
+# Conversión: ganados con ≥1 posterior
 agg_post_g = (
     df_post_from_g.groupby("origen_deal_id")["deal_id"]
     .nunique()
@@ -362,21 +378,7 @@ conversion_rate_g = (
     num_origen_con_post_g / num_origen_g * 100 if num_origen_g > 0 else 0
 )
 
-# ROI: solo consideramos negocios posteriores en USD
-if "deal_currency" in df_post_from_g_unique.columns:
-    total_post_amount_g_usd = df_post_from_g_unique.loc[
-        df_post_from_g_unique["deal_currency"] == "USD", "deal_amount"
-    ].sum()
-else:
-    total_post_amount_g_usd = df_post_from_g_unique["deal_amount"].sum()
-
-roi_factor_g = (
-    total_post_amount_g_usd / total_origen_g_amount
-    if total_origen_g_amount > 0
-    else 0
-)
-
-# Tiempo medio marketing → primer negocio posterior (para GANADOS)
+# Tiempo medio marketing → primer negocio posterior
 primer_posterior_g = (
     df_post_from_g.groupby("origen_deal_id")["deal_created_date"]
     .min()
@@ -388,22 +390,23 @@ tmp_g["dias_a_primer_posterior"] = (
 ).dt.days
 dias_prom_g = tmp_g["dias_a_primer_posterior"].mean() if not tmp_g.empty else np.nan
 
-col5.metric(
-    "Ganados con ≥1 negocio posterior",
-    f"{num_origen_con_post_g:,}",
-)
-col6.metric(
-    "Tasa de conversión ganados → posteriores",
-    f"{conversion_rate_g:.1f}%" if num_origen_g > 0 else "N/A",
-)
-col7.metric(
-    "Factor de ingresos (posterior/origen, solo USD)",
-    f"{roi_factor_g:.2f}x" if total_origen_g_amount > 0 else "N/A",
+cg1, cg2, cg3, cg4 = st.columns(4)
+cg1.metric("Negocios de marketing ganados (USD)", f"{num_origen_g:,}")
+cg2.metric("Monto total ganado en marketing (USD)", f"${total_origen_g_usd:,.2f}")
+cg3.metric("Negocios posteriores derivados de ganados", f"{num_post_from_g_unicos:,}")
+cg4.metric(
+    "Factor de multiplicación (monto posterior USD / origin USD)",
+    f"{roi_factor_g:.2f}x" if not np.isnan(roi_factor_g) else "N/A",
 )
 
-st.caption(
-    "⚠️ Para el factor de ingresos solo se consideran negocios posteriores en USD, "
-    "ya que los negocios de marketing ganados están en USD."
+cg5, cg6 = st.columns(2)
+cg5.metric(
+    "Ganados con al menos 1 negocio posterior",
+    f"{num_origen_con_post_g:,}",
+)
+cg6.metric(
+    "Días promedio al primer negocio posterior (ganados)",
+    f"{dias_prom_g:.1f} días" if not np.isnan(dias_prom_g) else "N/A",
 )
 
 st.markdown("---")
@@ -411,7 +414,7 @@ st.markdown("---")
 # -------------------------
 # DISTRIBUCIÓN DE ESTADOS
 # -------------------------
-st.markdown("### 🧩 Distribución de estados comerciales y de marketing")
+st.markdown("## 🧩 Distribución de estados comerciales y de marketing")
 col_est1, col_est2 = st.columns(2)
 
 with col_est1:
@@ -426,10 +429,14 @@ with col_est1:
             estado_counts_amt,
             names="estado_comercial",
             values="deal_amount",
-            color_discrete_sequence=px.colors.sequential.Blues,
-            hole=0.4,
+            hole=0.45,
+            color_discrete_sequence=COLOR_SEQ,
         )
-        fig_estado = style_fig(fig_estado)
+        fig_estado.update_layout(
+            margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
         st.plotly_chart(fig_estado, use_container_width=True)
     else:
         st.info("No hay negocios posteriores con los filtros actuales.")
@@ -450,14 +457,15 @@ with col_est2:
             y="num_deals",
             color="estado_marketing",
             barmode="stack",
-            color_discrete_sequence=px.colors.sequential.Blues,
+            color_discrete_sequence=COLOR_SEQ,
         )
         fig_mkt.update_layout(
             xaxis_title="Pipeline de marketing",
-            yaxis_title="Núm. negocios",
+            yaxis_title="Número de negocios",
             margin=dict(l=10, r=10, t=30, b=80),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(15,23,42,0.9)",
         )
-        fig_mkt = style_fig(fig_mkt)
         st.plotly_chart(fig_mkt, use_container_width=True)
     else:
         st.info("No hay negocios de origen con los filtros actuales.")
@@ -467,7 +475,7 @@ st.markdown("---")
 # -------------------------
 # EVOLUCIÓN TEMPORAL
 # -------------------------
-st.markdown("### 📆 Evolución temporal")
+st.markdown("## 📆 Evolución temporal")
 
 col_time1, col_time2 = st.columns(2)
 
@@ -489,14 +497,15 @@ with col_time1:
             x="mes",
             y="num_negocios",
             hover_data=["monto_origen"],
-            color_discrete_sequence=px.colors.sequential.Blues,
+            color_discrete_sequence=[COLOR_SEQ[0]],
         )
         fig_evo.update_layout(
             xaxis_title="Mes",
             yaxis_title="Negocios de marketing",
             margin=dict(l=10, r=10, t=40, b=40),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(15,23,42,0.9)",
         )
-        fig_evo = style_fig(fig_evo)
         st.plotly_chart(fig_evo, use_container_width=True)
     else:
         st.info("No hay negocios de marketing con los filtros actuales.")
@@ -519,14 +528,15 @@ with col_time2:
             x="mes",
             y="num_negocios",
             hover_data=["monto_posterior"],
-            color_discrete_sequence=px.colors.sequential.Blues,
+            color_discrete_sequence=[COLOR_SEQ[1]],
         )
         fig_evo2.update_layout(
             xaxis_title="Mes",
             yaxis_title="Negocios posteriores",
             margin=dict(l=10, r=10, t=40, b=40),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(15,23,42,0.9)",
         )
-        fig_evo2 = style_fig(fig_evo2)
         st.plotly_chart(fig_evo2, use_container_width=True)
     else:
         st.info("No hay negocios posteriores con los filtros actuales.")
@@ -534,55 +544,58 @@ with col_time2:
 st.markdown("---")
 
 # -------------------------
-# MIX DE MARKETING POR UNIDAD / PRODUCTO
+# MIX DE MARKETING POR UNIDAD / ORIGEN
 # -------------------------
 st.subheader("🥧 Mix del pipeline iNBest.marketing")
 
 col_mix1, col_mix2 = st.columns(2)
 
 with col_mix1:
-    st.markdown("**Distribución de negocios de marketing por unidad de negocio**")
+    st.markdown("**Negocios de marketing por unidad de negocio**")
     if not df_origen_f.empty:
         mix_unidad = (
-            df_origen_f.groupby("origen_unidad_display")["origen_deal_id"]
+            df_origen_f.groupby("origen_unidad_norm")["origen_deal_id"]
             .nunique()
             .reset_index(name="num_deals")
         )
         fig_mix_unidad = px.pie(
             mix_unidad,
-            names="origen_unidad_display",
+            names="origen_unidad_norm",
             values="num_deals",
-            hole=0.3,
-            color_discrete_sequence=px.colors.sequential.Blues,
+            hole=0.35,
+            color_discrete_sequence=COLOR_SEQ,
         )
-        fig_mix_unidad = style_fig(fig_mix_unidad)
+        fig_mix_unidad.update_layout(
+            margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
         st.plotly_chart(fig_mix_unidad, use_container_width=True)
     else:
         st.info("No hay negocios de marketing con los filtros actuales.")
 
 with col_mix2:
-    st.markdown("**Distribución de negocios de marketing por producto catálogo**")
+    st.markdown("**Negocios de marketing por origen del negocio**")
     if not df_origen_f.empty:
-        mix_prod = df_origen_f.copy()
-        mix_prod = mix_prod[mix_prod["origen_producto_catalogo"] != "Sin dato"]
-        if mix_prod.empty:
-            st.info("La propiedad de producto catálogo no tiene valores útiles para este periodo.")
-        else:
-            mix_prod = (
-                mix_prod.groupby("origen_producto_catalogo")["origen_deal_id"]
-                .nunique()
-                .reset_index(name="num_deals")
-                .sort_values("num_deals", ascending=False)
-            )
-            fig_mix_prod = px.pie(
-                mix_prod,
-                names="origen_producto_catalogo",
-                values="num_deals",
-                hole=0.3,
-                color_discrete_sequence=px.colors.sequential.Blues,
-            )
-            fig_mix_prod = style_fig(fig_mix_prod)
-            st.plotly_chart(fig_mix_prod, use_container_width=True)
+        mix_origen = (
+            df_origen_f.groupby("origen_origen_del_negocio")["origen_deal_id"]
+            .nunique()
+            .reset_index(name="num_deals")
+            .sort_values("num_deals", ascending=False)
+        )
+        fig_mix_origen = px.pie(
+            mix_origen,
+            names="origen_origen_del_negocio",
+            values="num_deals",
+            hole=0.35,
+            color_discrete_sequence=COLOR_SEQ,
+        )
+        fig_mix_origen.update_layout(
+            margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
+        st.plotly_chart(fig_mix_origen, use_container_width=True)
     else:
         st.info("No hay negocios de marketing con los filtros actuales.")
 
@@ -609,15 +622,13 @@ else:
                 "etapa_marketing",
                 "estado_marketing",
                 "origen_origen_del_negocio",
-                "origen_unidad_display",
-                "origen_producto_catalogo",
+                "origen_unidad_norm",
                 "origen_amount",
                 "origen_duracion_meses",
             ],
         ]
     )
 
-    # Agregados de posteriores por negocio origen
     agg_post_count = (
         df_post_f.groupby("origen_deal_id")["deal_id"]
         .nunique()
@@ -646,47 +657,46 @@ else:
 st.markdown("---")
 
 # -------------------------
-# SECCIÓN INSIGHTS VISUALES (barras)
+# INSIGHTS VISUALES
 # -------------------------
 st.subheader("📈 Insights visuales")
 
 col_g1, col_g2 = st.columns(2)
 
-# 1) Monto posterior por unidad de negocio (deals únicos) y moneda
 with col_g1:
-    st.markdown("**Monto posterior por unidad de negocio y moneda (deals únicos)**")
+    st.markdown("**Monto posterior por unidad de negocio destino y moneda (deals únicos)**")
     if not df_post_f_unique.empty:
         tmp = df_post_f_unique.copy()
-        tmp["deal_unidad_display"] = tmp["deal_unidad_display"].replace(
-            {"": "Sin dato"}
+        tmp["deal_unidad_norm"] = tmp["deal_unidad_norm"].replace({"": "Sin unidad"})
+        tmp["deal_currency_norm"] = tmp["deal_currency_norm"].replace(
+            {"": "Sin moneda"}
         )
-        tmp["deal_currency"] = tmp["deal_currency"].replace({"": "Sin moneda"})
 
         monto_por_unidad = (
-            tmp.groupby(["deal_unidad_display", "deal_currency"])["deal_amount"]
+            tmp.groupby(["deal_unidad_norm", "deal_currency_norm"])["deal_amount"]
             .sum()
             .reset_index()
             .sort_values("deal_amount", ascending=False)
         )
         fig_owner = px.bar(
             monto_por_unidad,
-            x="deal_unidad_display",
+            x="deal_unidad_norm",
             y="deal_amount",
-            color="deal_currency",
+            color="deal_currency_norm",
             barmode="group",
-            color_discrete_sequence=["#38bdf8", "#6366f1", "#a855f7"],
+            color_discrete_sequence=COLOR_SEQ,
         )
         fig_owner.update_layout(
-            xaxis_title="Unidad de negocio (posterior)",
+            xaxis_title="Unidad de negocio destino",
             yaxis_title="Monto posterior",
             margin=dict(l=10, r=10, t=30, b=80),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(15,23,42,0.9)",
         )
-        fig_owner = style_fig(fig_owner)
         st.plotly_chart(fig_owner, use_container_width=True)
     else:
         st.info("No hay negocios posteriores con los filtros actuales.")
 
-# 2) Cantidad de deals posteriores por pipeline comercial
 with col_g2:
     st.markdown("**Cantidad de negocios posteriores por pipeline comercial**")
     if not df_post_f_unique.empty:
@@ -702,14 +712,17 @@ with col_g2:
             deals_por_pipeline,
             x="pipeline_comercial",
             y="num_deals",
-            color_discrete_sequence=px.colors.sequential.Blues,
+            color="pipeline_comercial",
+            color_discrete_sequence=COLOR_SEQ,
         )
         fig_pipe.update_layout(
             xaxis_title="Pipeline comercial",
-            yaxis_title="Núm. negocios",
+            yaxis_title="Número de negocios",
             margin=dict(l=10, r=10, t=30, b=80),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(15,23,42,0.9)",
+            showlegend=False,
         )
-        fig_pipe = style_fig(fig_pipe)
         st.plotly_chart(fig_pipe, use_container_width=True)
     else:
         st.info("No hay negocios posteriores con los filtros actuales.")
@@ -717,9 +730,9 @@ with col_g2:
 st.markdown("---")
 
 # -------------------------
-# SANKEY: ORIGEN_DEL_NEGOCIO → UNIDAD_DE_NEGOCIO_ASIGNADA
+# SANKEY: ORIGEN_DEL_NEGOCIO → UNIDAD_DE_NEGOCIO_DESTINO
 # -------------------------
-st.subheader("🔀 Flujo: Origen del negocio (marketing) → Unidad de negocio asignada (posterior)")
+st.subheader("🔀 Flujo: Origen del negocio (marketing) → Unidad de negocio destino (posterior)")
 
 if df_post_f.empty:
     st.info("No hay negocios posteriores para construir el diagrama de flujo con los filtros actuales.")
@@ -738,7 +751,6 @@ else:
             value=True,
         )
 
-    # BASE DEL SANKEY: UNA FILA POR (origen_deal_id, deal_id)
     sankey_base = (
         df_post_f
         .drop_duplicates(subset=["origen_deal_id", "deal_id"])
@@ -751,9 +763,12 @@ else:
     if sankey_base.empty:
         st.info("No hay datos suficientes para el Sankey con los filtros seleccionados.")
     else:
-        # Etiquetas de origen (origen_del_negocio marketing) y destino (unidad_de_negocio_asignada posterior)
-        sankey_base["origen_label"] = sankey_base["origen_origen_del_negocio"].replace({"": "Sin origen"})
-        sankey_base["destino_label"] = sankey_base["deal_unidad_display"].replace({"": "Sin unidad"})
+        sankey_base["origen_label"] = sankey_base["origen_origen_del_negocio"].replace(
+            {"": "Sin origen"}
+        )
+        sankey_base["destino_label"] = sankey_base["deal_unidad_norm"].replace(
+            {"": "Sin unidad"}
+        )
 
         sankey_group = (
             sankey_base.groupby(["origen_label", "destino_label"])
@@ -788,8 +803,8 @@ else:
             n_origen = len(origen_labels)
             n_destino = len(destino_labels)
             colors = (
-                ["rgba(56, 189, 248, 0.9)"] * n_origen  # origen_del_negocio
-                + ["rgba(99, 102, 241, 0.9)"] * n_destino  # unidad_de_negocio_asignada
+                ["#38bdf8"] * n_origen  # origen
+                + ["#6366f1"] * n_destino  # destino
             )
 
             fig = go.Figure(
@@ -798,7 +813,7 @@ else:
                         node=dict(
                             pad=20,
                             thickness=20,
-                            line=dict(width=0.5, color="rgba(148, 163, 184, 0.6)"),
+                            line=dict(width=0.5, color="#0f172a"),
                             label=labels,
                             color=colors,
                         ),
@@ -806,7 +821,7 @@ else:
                             source=sources,
                             target=targets,
                             value=values,
-                            color="rgba(148, 163, 184, 0.4)",
+                            color="rgba(148, 163, 184, 0.5)",
                         ),
                     )
                 ]
@@ -815,9 +830,8 @@ else:
             fig.update_layout(
                 height=550,
                 margin=dict(l=10, r=10, t=10, b=10),
-                font_color="#e2f3ff",
                 paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(15,23,42,0.9)",
             )
 
             st.plotly_chart(fig, use_container_width=True)
@@ -826,11 +840,11 @@ else:
                 """
                 **Cómo leer el gráfico:**
 
-                - Cada bloque del lado izquierdo es el **origen del negocio** del pipeline de marketing.
-                - Cada bloque del lado derecho es la **unidad de negocio asignada** de los negocios posteriores.
-                - El grosor de la cinta representa la métrica seleccionada:
-                  - **Monto posterior total**: suma del `deal_amount` de los negocios posteriores.
-                  - **Número de negocios posteriores**: cantidad de deals distintos.
+                - Bloques de la izquierda: **origen del negocio** del pipeline de marketing.
+                - Bloques de la derecha: **unidad de negocio destino** de los negocios posteriores.
+                - El grosor de las cintas representa:
+                  - **Monto posterior total** (suma de `deal_amount`), o
+                  - **Número de negocios posteriores** (deals distintos).
                 """
             )
 
