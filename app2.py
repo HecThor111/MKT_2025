@@ -8,10 +8,10 @@ import plotly.express as px
 # 1. CONFIGURACIÓN Y ESTILO VISUAL (CSS FUTURISTA)
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="HubSpot Galactic Dashboard",
+    page_title="Reporte Marketing 2025",
     layout="wide",
     initial_sidebar_state="expanded",
-    page_icon="🌌"
+    page_icon="🚀"
 )
 
 # Paleta de colores vibrante
@@ -21,11 +21,39 @@ COLOR_PALETTE = ["#38bdf8", "#0ea5e9", "#6366f1", "#22d3ee", "#8b5cf6", "#ec4899
 st.markdown(
     """
     <style>
+    /* VARIABLES GLOBALES PARA ELIMINAR EL ROJO POR DEFECTO */
+    :root {
+        --primary-color: #38bdf8;
+        --background-color: #0B0F19;
+        --secondary-background-color: #111827;
+        --text-color: #f0f9ff;
+        --font: 'Inter', sans-serif;
+    }
+
     /* Fondo general */
     .stApp {
         background-color: #0B0F19;
     }
     
+    /* SOBRESCRIBIR EL ACENTO ROJO/NARANJA DE STREAMLIT EN WIDGETS */
+    div.stDateInput > div > div > input {
+        color: #38bdf8;
+    }
+    div.stMultiSelect span[data-baseweb="tag"] {
+        background-color: #1e293b !important;
+        border: 1px solid #38bdf8 !important;
+    }
+    div.stMultiSelect div[data-baseweb="select"] {
+        border-color: #38bdf8 !important;
+    }
+    /* Checkbox y Radios */
+    .stCheckbox div[data-testid="stMarkdownContainer"] p {
+        color: #cbd5e1 !important;
+    }
+    span[data-baseweb="checkbox"] div {
+        background-color: #38bdf8 !important;
+    }
+
     /* Estilo para las métricas (KPI Cards) */
     div[data-testid="metric-container"] {
         display: none; 
@@ -231,7 +259,7 @@ df_post_f_unique = df_post_f.sort_values("deal_created_date").drop_duplicates(su
 # -----------------------------------------------------------------------------
 # 5. HEADER Y KPI'S IMPACTO (SOLO CONTEOS Y DURACIÓN)
 # -----------------------------------------------------------------------------
-st.title("🌌 iNBest.marketing | Galactic Dashboard")
+st.title("🚀 Reporte de Lead Marketing 2025")
 
 # --- Lógica KPIs Ganados ---
 df_origen_ganados = df_origen_f[df_origen_f["estado_marketing"] == "Ganado"].copy()
@@ -240,16 +268,19 @@ df_post_de_ganados = df_post_f_unique[df_post_f_unique["origen_deal_id"].isin(id
 
 # Cálculos
 w_count = df_origen_ganados["origen_deal_id"].nunique()
-w_post_count = df_post_de_ganados["deal_id"].nunique()
-# Suma de monto USD marketing (Confirmado certeza)
+
+# Monto USD (Marketing Ganado - Dato seguro)
 w_amount_usd = df_origen_ganados["origen_amount"].sum()
+
+# KPI solicitado: "Negocios posteriores creados" = Suma de 'origen_duracion_meses'
+val_kpi_posterior = df_origen_ganados["origen_duracion_meses"].sum()
 
 st.subheader("🏆 Impacto Comercial (Origen Ganado)")
 c_imp1, c_imp2, c_imp3 = st.columns(3)
 
 with c_imp1: display_kpi("Deals Ganados (Mkt)", f"{w_count}", "Cierre Ganado")
 with c_imp2: display_kpi("Monto Ganado (USD)", f"${w_amount_usd:,.2f}", "Total Pipeline Marketing")
-with c_imp3: display_kpi("Negocios posteriores creados", f"{w_post_count}", "Deals generados")
+with c_imp3: display_kpi("Negocios posteriores creados", f"{val_kpi_posterior:,.1f}", "Suma Duración (Meses)")
 
 st.markdown("---")
 
@@ -277,7 +308,7 @@ if not df_origen_f.empty:
         .sort_values("num_deals", ascending=False)
     )
     
-    # Obtener el valor máximo para ajustar la escala del eje Y
+    # Escala
     max_val = etapa_counts["num_deals"].max()
     
     fig_etapas = px.bar(
@@ -286,7 +317,7 @@ if not df_origen_f.empty:
         color_discrete_sequence=[COLOR_PALETTE[0]]
     )
     
-    # CORRECCIÓN DE ETIQUETAS: Posición fuera y color visible
+    # Configuración de etiquetas fuera
     fig_etapas.update_traces(
         textposition='outside', 
         textfont=dict(color='white'),
@@ -298,7 +329,6 @@ if not df_origen_f.empty:
         yaxis_title="Deals",
         template="plotly_dark", 
         plot_bgcolor="rgba(0,0,0,0)",
-        # Dar un 20% extra de margen arriba para que quepa el número
         yaxis=dict(range=[0, max_val * 1.2]) 
     )
     st.plotly_chart(fig_etapas, use_container_width=True)
@@ -580,4 +610,4 @@ else:
             hide_index=True,
         )
 
-st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado para iNBest.marketing | 2025 Edition 🚀</div>", unsafe_allow_html=True)
+st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
