@@ -14,7 +14,7 @@ st.set_page_config(
     page_icon="🌌"
 )
 
-# Paleta de colores vibrante (Neon/Space)
+# Paleta de colores vibrante
 COLOR_PALETTE = ["#38bdf8", "#0ea5e9", "#6366f1", "#22d3ee", "#8b5cf6", "#ec4899", "#f472b6"]
 
 # Inyección de CSS
@@ -108,19 +108,6 @@ def clasificar_estado_etapa(etapa: str) -> str:
         return "Descartado"
     return "Abierto"
 
-def inferir_moneda(monto: float, moneda_raw: str) -> str:
-    """
-    Infiere moneda: Si vacío, >50k es MXN, sino USD.
-    """
-    m = str(moneda_raw).upper().strip()
-    if m in ["USD", "MXN"]:
-        return m
-    
-    if monto > 50000:
-        return "MXN"
-    else:
-        return "USD"
-
 def normalizar_unidad(unidad_raw: str, pipeline_label: str) -> str:
     texto_base = str(unidad_raw) if unidad_raw and unidad_raw.lower() not in ["nan", "sin dato", ""] else str(pipeline_label)
     texto = texto_base.lower()
@@ -178,13 +165,6 @@ def load_data(path: str) -> pd.DataFrame:
     # Estados
     df["estado_marketing"] = df["etapa_marketing"].apply(clasificar_estado_etapa)
     df["estado_comercial"] = df["etapa_comercial"].apply(clasificar_estado_etapa)
-
-    # Monedas (Inferencia)
-    df["origen_currency_raw"] = df.get("origen_currency", "").fillna("").astype(str)
-    df["deal_currency_raw"] = df.get("deal_currency", "").fillna("").astype(str)
-
-    df["origen_currency"] = df.apply(lambda x: inferir_moneda(x["origen_amount"], x["origen_currency_raw"]), axis=1)
-    df["deal_currency"] = df.apply(lambda x: inferir_moneda(x["deal_amount"], x["deal_currency_raw"]), axis=1)
 
     # Normalización Unidades
     df["origen_unidad_raw"] = df.get("origen_unidad_de_negocio_asignada", "").fillna("").astype(str)
@@ -249,7 +229,7 @@ df_post_f = df_post_all[df_post_all["origen_deal_id"].isin(ids_origen_validos)].
 df_post_f_unique = df_post_f.sort_values("deal_created_date").drop_duplicates(subset=["deal_id"])
 
 # -----------------------------------------------------------------------------
-# 5. HEADER Y KPI'S IMPACTO (SOLO USD PARA GANADOS)
+# 5. HEADER Y KPI'S IMPACTO (SOLO CONTEOS Y DURACIÓN)
 # -----------------------------------------------------------------------------
 st.title("🌌 iNBest.marketing | Galactic Dashboard")
 
@@ -261,37 +241,32 @@ df_post_de_ganados = df_post_f_unique[df_post_f_unique["origen_deal_id"].isin(id
 # Cálculos
 w_count = df_origen_ganados["origen_deal_id"].nunique()
 w_post_count = df_post_de_ganados["deal_id"].nunique()
-# Suma solo USD como KPI de impacto financiero principal
-w_post_usd = df_post_de_ganados[df_post_de_ganados["deal_currency"] == "USD"]["deal_amount"].sum()
+# Suma de meses de duración en lugar de monto
+w_duracion_total = df_origen_ganados["origen_duracion_meses"].sum()
 
 st.subheader("🏆 Impacto Comercial (Origen Ganado)")
 c_imp1, c_imp2, c_imp3 = st.columns(3)
 
 with c_imp1: display_kpi("Deals Ganados (Mkt)", f"{w_count}", "Cierre Ganado")
-with c_imp2: display_kpi("Derivados Comerciales", f"{w_post_count}", "Deals generados")
-with c_imp3: display_kpi("Monto Generado (USD)", f"${w_post_usd:,.2f}", "De Ganados Mkt")
+with c_imp2: display_kpi("Duración Total Contratada", f"{w_duracion_total:,.1f}", "Suma Meses (Ganados)")
+with c_imp3: display_kpi("Derivados Comerciales", f"{w_post_count}", "Deals generados")
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 6. KPI'S GENERALES Y VOLUMEN
+# 6. KPI'S GENERALES (SOLO VOLUMEN)
 # -----------------------------------------------------------------------------
 st.subheader("📡 Métricas Generales (Todo el Pipeline)")
 
 kpi_mkt_count = df_origen_f["origen_deal_id"].nunique()
 kpi_post_total_unique = df_post_f_unique["deal_id"].nunique()
-# Sumas globales
-total_usd = df_post_f_unique[df_post_f_unique["deal_currency"] == "USD"]["deal_amount"].sum()
-total_mxn = df_post_f_unique[df_post_f_unique["deal_currency"] == "MXN"]["deal_amount"].sum()
 
-col_gen1, col_gen2, col_gen3, col_gen4 = st.columns(4)
+col_gen1, col_gen2 = st.columns(2)
 with col_gen1: display_kpi("Total Marketing", f"{kpi_mkt_count:,}", "Todos los estados")
 with col_gen2: display_kpi("Total Posteriores", f"{kpi_post_total_unique:,}", "Todos los estados")
-with col_gen3: display_kpi("Total Pipeline (USD)", f"${total_usd:,.2f}", "Suma General")
-with col_gen4: display_kpi("Total Pipeline (MXN)", f"${total_mxn:,.2f}", "Suma General")
 
 # -----------------------------------------------------------------------------
-# 7. GRAFICA: NEGOCIOS POR ETAPA MKT (FUNNEL)
+# 7. GRÁFICA: NEGOCIOS POR ETAPA MKT (FUNNEL)
 # -----------------------------------------------------------------------------
 st.markdown("### 🧬 Negocios de Marketing por Etapa")
 if not df_origen_f.empty:
@@ -306,6 +281,9 @@ if not df_origen_f.empty:
         text="num_deals",
         color_discrete_sequence=[COLOR_PALETTE[0]]
     )
+    # Corrección para que el texto se ajuste automáticamente
+    fig_etapas.update_traces(textposition='auto', cliponaxis=False)
+    
     fig_etapas.update_layout(
         xaxis_title="Etapa", yaxis_title="Deals",
         template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)"
@@ -317,33 +295,15 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 8. DISTRIBUCIÓN DE ESTADOS (SIDE-BY-SIDE)
+# 8. DISTRIBUCIÓN DE ESTADOS (TODOS LOS PIPES)
 # -----------------------------------------------------------------------------
 st.subheader("🧩 Distribución de Estados")
 
 col_est1, col_est2 = st.columns(2)
 
 with col_est1:
-    st.markdown("**Posteriores por Estado Comercial (Monto Global)**")
-    if not df_post_f_unique.empty:
-        estado_counts_amt = (
-            df_post_f_unique.groupby("estado_comercial")["deal_amount"]
-            .sum()
-            .reset_index()
-        )
-        fig_estado = px.pie(
-            estado_counts_amt, names="estado_comercial", values="deal_amount",
-            hole=0.4, color_discrete_sequence=COLOR_PALETTE
-        )
-        fig_estado.update_layout(template="plotly_dark", margin=dict(l=0, r=0, t=30, b=0))
-        st.plotly_chart(fig_estado, use_container_width=True)
-    else:
-        st.info("No hay negocios posteriores.")
-
-with col_est2:
-    st.markdown("**Estados de Marketing por Pipeline**")
+    st.markdown("**Estados de Marketing (Pipeline Marketing)**")
     if not df_origen_f.empty:
-        # Aseguramos colores vibrantes (opacity 1)
         mkt_estado = (
             df_origen_f.groupby(["pipeline_marketing", "estado_marketing"])["origen_deal_id"]
             .nunique()
@@ -357,14 +317,37 @@ with col_est2:
         fig_mkt.update_layout(
             template="plotly_dark", 
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="Pipeline", yaxis_title="Deals",
-            legend_title="Estado"
+            xaxis_title="Pipeline", yaxis_title="Deals"
         )
-        # Forzar opacidad al 100%
         fig_mkt.update_traces(marker=dict(opacity=1.0))
         st.plotly_chart(fig_mkt, use_container_width=True)
     else:
         st.info("No hay negocios de origen.")
+
+with col_est2:
+    st.markdown("**Estados Comerciales (Todos los Pipelines Comerciales)**")
+    if not df_post_f_unique.empty:
+        # Agrupamos por pipeline comercial y estado
+        com_estado = (
+            df_post_f_unique.groupby(["pipeline_comercial", "estado_comercial"])["deal_id"]
+            .nunique()
+            .reset_index(name="num_deals")
+        )
+        
+        fig_com = px.bar(
+            com_estado, x="pipeline_comercial", y="num_deals",
+            color="estado_comercial", barmode="stack",
+            color_discrete_sequence=COLOR_PALETTE
+        )
+        fig_com.update_layout(
+            template="plotly_dark", 
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Pipeline", yaxis_title="Deals"
+        )
+        fig_com.update_traces(marker=dict(opacity=1.0))
+        st.plotly_chart(fig_com, use_container_width=True)
+    else:
+        st.info("No hay negocios posteriores.")
 
 st.markdown("---")
 
@@ -376,7 +359,7 @@ st.subheader("📅 Evolución Temporal")
 col_time1, col_time2 = st.columns(2)
 
 with col_time1:
-    st.markdown("**Marketing por Mes**")
+    st.markdown("**Negocios de marketing por mes**")
     if not df_origen_f.empty:
         tmp = df_origen_f.copy()
         tmp["mes"] = tmp["origen_created_date"].dt.to_period("M").dt.to_timestamp()
@@ -392,7 +375,7 @@ with col_time1:
         st.info("Sin datos.")
 
 with col_time2:
-    st.markdown("**Posteriores por Mes**")
+    st.markdown("**Negocios posteriores por mes**")
     if not df_post_f_unique.empty:
         tmp = df_post_f_unique.copy()
         tmp["mes"] = tmp["deal_created_date"].dt.to_period("M").dt.to_timestamp()
@@ -410,65 +393,45 @@ with col_time2:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 10. MIX DE MARKETING (UNIDAD Y PRODUCTO)
+# 10. POR UNIDAD DE NEGOCIO (SIN MIX / SIN PRODUCTO)
 # -----------------------------------------------------------------------------
-st.subheader("🥧 Mix del Pipeline iNBest.marketing")
+st.subheader("🥧 Distribución por Unidad de Negocio (Marketing)")
 
-col_mix1, col_mix2 = st.columns(2)
-
-with col_mix1:
-    st.markdown("**Por Unidad de Negocio (Mkt)**")
-    if not df_origen_f.empty:
-        mix_unidad = df_origen_f.groupby("origen_unidad_norm")["origen_deal_id"].nunique().reset_index(name="count")
-        fig_mix_u = px.pie(
-            mix_unidad, names="origen_unidad_norm", values="count",
-            hole=0.4, color_discrete_sequence=COLOR_PALETTE
-        )
-        fig_mix_u.update_layout(template="plotly_dark", margin=dict(t=0,b=0,l=0,r=0))
-        st.plotly_chart(fig_mix_u, use_container_width=True)
-
-with col_mix2:
-    st.markdown("**Por Producto Catálogo (Mkt)**")
-    if not df_origen_f.empty:
-        mix_prod = df_origen_f.groupby("origen_producto_catalogo")["origen_deal_id"].nunique().reset_index(name="count").sort_values("count", ascending=False)
-        fig_mix_p = px.pie(
-            mix_prod, names="origen_producto_catalogo", values="count",
-            hole=0.4, color_discrete_sequence=COLOR_PALETTE
-        )
-        fig_mix_p.update_layout(template="plotly_dark", margin=dict(t=0,b=0,l=0,r=0))
-        st.plotly_chart(fig_mix_p, use_container_width=True)
+if not df_origen_f.empty:
+    mix_unidad = df_origen_f.groupby("origen_unidad_norm")["origen_deal_id"].nunique().reset_index(name="count")
+    fig_mix_u = px.pie(
+        mix_unidad, names="origen_unidad_norm", values="count",
+        hole=0.4, color_discrete_sequence=COLOR_PALETTE
+    )
+    fig_mix_u.update_layout(template="plotly_dark", margin=dict(t=0,b=0,l=0,r=0))
+    st.plotly_chart(fig_mix_u, use_container_width=True)
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 11. TABLA RESUMEN POR NEGOCIO ORIGEN
+# 11. TABLA RESUMEN POR NEGOCIO ORIGEN (SIN MONTOS)
 # -----------------------------------------------------------------------------
 st.subheader("📌 Resumen Detallado por Negocio Marketing")
 
 if not df_origen_f.empty:
     # Preparar tabla base
     base = df_origen_f[["origen_deal_id", "origen_deal_name", "origen_created_date", "pipeline_marketing", 
-                        "etapa_marketing", "estado_marketing", "origen_unidad_norm", "origen_amount", "origen_currency"]].copy()
+                        "etapa_marketing", "estado_marketing", "origen_unidad_norm"]].copy()
     
-    # Agregar datos posteriores
+    # Agregar datos posteriores (solo conteo)
     agg_post = df_post_f.groupby("origen_deal_id").agg(
-        num_post=("deal_id", "nunique"),
-        monto_post=("deal_amount", "sum"),
-        monedas_post=("deal_currency", lambda x: ", ".join(set(x)))
+        num_post=("deal_id", "nunique")
     ).reset_index()
 
     resumen = base.merge(agg_post, on="origen_deal_id", how="left")
     resumen["num_post"] = resumen["num_post"].fillna(0).astype(int)
-    resumen["monto_post"] = resumen["monto_post"].fillna(0.0)
 
     st.dataframe(
-        resumen.sort_values("monto_post", ascending=False),
+        resumen.sort_values("num_post", ascending=False),
         use_container_width=True,
         hide_index=True,
         column_config={
             "origen_created_date": st.column_config.DateColumn("Fecha"),
-            "origen_amount": st.column_config.NumberColumn("Monto Mkt", format="$%.2f"),
-            "monto_post": st.column_config.NumberColumn("Monto Post (Mix)", format="$%.2f"),
         }
     )
 else:
@@ -477,22 +440,23 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 12. INSIGHTS VISUALES (BARRAS AVANZADAS)
+# 12. INSIGHTS VISUALES (SIN CLASIFICACIÓN MONEDA)
 # -----------------------------------------------------------------------------
 st.subheader("📈 Insights Visuales")
 
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
-    st.markdown("**Monto Posterior por Unidad y Moneda**")
+    st.markdown("**Deals Posteriores por Unidad Destino**")
     if not df_post_f_unique.empty:
-        # Agrupación por unidad normalizada y moneda
-        monto_u = df_post_f_unique.groupby(["deal_unidad_norm", "deal_currency"])["deal_amount"].sum().reset_index()
+        # Agrupación solo por unidad, sin moneda
+        deals_u = df_post_f_unique.groupby("deal_unidad_norm")["deal_id"].nunique().reset_index(name="count").sort_values("count", ascending=False)
         fig_ins1 = px.bar(
-            monto_u, x="deal_unidad_norm", y="deal_amount", color="deal_currency",
-            barmode="group", color_discrete_map={"USD": "#38bdf8", "MXN": "#ec4899"}
+            deals_u, x="deal_unidad_norm", y="count", 
+            text="count",
+            color_discrete_sequence=[COLOR_PALETTE[2]]
         )
-        fig_ins1.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Unidad", yaxis_title="Monto")
+        fig_ins1.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Unidad", yaxis_title="Num Deals")
         st.plotly_chart(fig_ins1, use_container_width=True)
     else:
         st.info("Sin datos.")
@@ -503,6 +467,7 @@ with col_g2:
         deals_pipe = df_post_f_unique.groupby("pipeline_comercial")["deal_id"].nunique().reset_index(name="count").sort_values("count", ascending=False)
         fig_ins2 = px.bar(
             deals_pipe, x="pipeline_comercial", y="count",
+            text="count",
             color_discrete_sequence=[COLOR_PALETTE[4]]
         )
         fig_ins2.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Pipeline", yaxis_title="Num Deals")
@@ -552,7 +517,7 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 14. DESGLOSE ORIGINAL (TABLAS SIN FORMATO)
+# 14. DESGLOSE (SOLO CONTEO DE DEALS - SIN MONTOS)
 # -----------------------------------------------------------------------------
 st.subheader("📊 Desglose por pipeline y etapa comercial")
 
@@ -562,16 +527,14 @@ else:
     col_t1, col_t2 = st.columns(2)
 
     with col_t1:
-        st.markdown("**Top pipelines comerciales por monto posterior**")
+        st.markdown("**Top pipelines comerciales (por cantidad)**")
         top_pipelines = (
             df_post_f.groupby("pipeline_comercial")
             .agg(
                 num_deals=("deal_id", "nunique"),
-                monto_total=("deal_amount", "sum"),
-                monto_promedio=("deal_amount", "mean"),
             )
             .reset_index()
-            .sort_values("monto_total", ascending=False)
+            .sort_values("num_deals", ascending=False)
         )
         st.dataframe(
             top_pipelines,
@@ -593,10 +556,9 @@ else:
             df_etapas.groupby("etapa_comercial")
             .agg(
                 num_deals=("deal_id", "nunique"),
-                monto_total=("deal_amount", "sum"),
             )
             .reset_index()
-            .sort_values("monto_total", ascending=False)
+            .sort_values("num_deals", ascending=False)
         )
 
         st.dataframe(
