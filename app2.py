@@ -259,7 +259,7 @@ df_post_f_unique = df_post_f.sort_values("deal_created_date").drop_duplicates(su
 # -----------------------------------------------------------------------------
 # 5. HEADER Y KPI'S IMPACTO (SOLO CONTEOS Y DURACIÓN)
 # -----------------------------------------------------------------------------
-st.title("🚀 Reporte de Lead Marketing 2025")
+st.title("🚀 Reporte de Leads Marketing 2025")
 
 # --- Lógica KPIs Ganados ---
 df_origen_ganados = df_origen_f[df_origen_f["estado_marketing"] == "Ganado"].copy()
@@ -611,4 +611,5 @@ else:
         )
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
+
 
