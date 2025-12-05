@@ -261,7 +261,7 @@ df_post_de_ganados = df_post_f_unique[df_post_f_unique["origen_deal_id"].isin(id
 # Cálculos
 w_count = df_origen_ganados["origen_deal_id"].nunique()
 w_post_count = df_post_de_ganados["deal_id"].nunique()
-# Suma solo USD como KPI de impacto financiero principal (eliminando MXN de aquí como pedido)
+# Suma solo USD como KPI de impacto financiero principal
 w_post_usd = df_post_de_ganados[df_post_de_ganados["deal_currency"] == "USD"]["deal_amount"].sum()
 
 st.subheader("🏆 Impacto Comercial (Origen Ganado)")
@@ -369,7 +369,7 @@ with col_est2:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 9. EVOLUCIÓN TEMPORAL (ORIGINAL 2 GRAFICAS)
+# 9. EVOLUCIÓN TEMPORAL
 # -----------------------------------------------------------------------------
 st.subheader("📅 Evolución Temporal")
 
@@ -441,7 +441,7 @@ with col_mix2:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 11. TABLA RESUMEN POR NEGOCIO ORIGEN (RESTAURADA)
+# 11. TABLA RESUMEN POR NEGOCIO ORIGEN
 # -----------------------------------------------------------------------------
 st.subheader("📌 Resumen Detallado por Negocio Marketing")
 
@@ -552,9 +552,9 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 14. DESGLOSE DETALLADO (MOVIDO AL FINAL)
+# 14. DESGLOSE ORIGINAL (TABLAS SIN FORMATO)
 # -----------------------------------------------------------------------------
-st.subheader("📊 Desglose por Pipeline y Etapa Comercial")
+st.subheader("📊 Desglose por pipeline y etapa comercial")
 
 if df_post_f.empty:
     st.info("No hay datos posteriores con los filtros actuales.")
@@ -562,7 +562,7 @@ else:
     col_t1, col_t2 = st.columns(2)
 
     with col_t1:
-        st.markdown("**Top Pipelines Comerciales (por Monto)**")
+        st.markdown("**Top pipelines comerciales por monto posterior**")
         top_pipelines = (
             df_post_f.groupby("pipeline_comercial")
             .agg(
@@ -577,40 +577,32 @@ else:
             top_pipelines,
             use_container_width=True,
             hide_index=True,
-            column_config={
-                "monto_total": st.column_config.NumberColumn("Monto Mix", format="$%.2f"),
-                "monto_promedio": st.column_config.NumberColumn("Promedio Mix", format="$%.2f"),
-            }
         )
 
     with col_t2:
-        st.markdown("**Detalle de Etapas (Seleccionar Pipeline)**")
+        st.markdown("**Detalle de etapas dentro de un pipeline comercial**")
         pipelines_disp = sorted(df_post_f["pipeline_comercial"].unique())
-        
-        if pipelines_disp:
-            pipeline_sel = st.selectbox("Selecciona pipeline comercial", options=pipelines_disp)
+        pipeline_sel = st.selectbox(
+            "Selecciona pipeline comercial",
+            options=pipelines_disp,
+        )
 
-            df_etapas = df_post_f[df_post_f["pipeline_comercial"] == pipeline_sel]
+        df_etapas = df_post_f[df_post_f["pipeline_comercial"] == pipeline_sel]
 
-            etapas = (
-                df_etapas.groupby("etapa_comercial")
-                .agg(
-                    num_deals=("deal_id", "nunique"),
-                    monto_total=("deal_amount", "sum"),
-                )
-                .reset_index()
-                .sort_values("monto_total", ascending=False)
+        etapas = (
+            df_etapas.groupby("etapa_comercial")
+            .agg(
+                num_deals=("deal_id", "nunique"),
+                monto_total=("deal_amount", "sum"),
             )
+            .reset_index()
+            .sort_values("monto_total", ascending=False)
+        )
 
-            st.dataframe(
-                etapas,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "monto_total": st.column_config.NumberColumn("Monto Total", format="$%.2f")
-                }
-            )
-        else:
-            st.warning("No hay pipelines comerciales disponibles.")
+        st.dataframe(
+            etapas,
+            use_container_width=True,
+            hide_index=True,
+        )
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado para iNBest.marketing | 2025 Edition 🚀</div>", unsafe_allow_html=True)
