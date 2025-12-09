@@ -318,32 +318,45 @@ with st.expander("🔍 Ver Detalle de Negocios (Abiertos y Perdidos)"):
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 6. FILA 2: KPIs SECUNDARIOS (IMPACTO COMERCIAL GANADO)
+# 6. FILA 2: KPIs SECUNDARIOS (IMPACTO COMERCIAL GANADO + NUEVOS INDICADORES)
 # -----------------------------------------------------------------------------
-# Lógica corregida: Usar datos de Ventas Ganados Realmente
+# Usamos los ganados reales de ventas
 df_post_ganados_real = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Ganado"].copy()
 
-# Cálculos reales basados en ventas cerradas
+# 1. Total Deals y Monto
 deals_ganados_count = len(df_post_ganados_real)
 monto_ganado_total = df_post_ganados_real["deal_amount"].sum()
 
-# Duración Leads Origen
-ids_origen_de_ganados = df_post_ganados_real["origen_deal_id"].unique()
-df_origen_de_ganados = df_origen_f[df_origen_f["origen_deal_id"].isin(ids_origen_de_ganados)]
-val_kpi_duracion = df_origen_de_ganados["origen_duracion_meses"].sum()
+# 2. Tasa de Multiplicación (Deals Ganados / Leads de Origen Únicos)
+unique_origins_count = df_post_ganados_real["origen_deal_id"].nunique()
+tasa_multiplicacion = deals_ganados_count / unique_origins_count if unique_origins_count > 0 else 0
+
+# 3. Tiempo Promedio de Creación del Primer Negocio
+avg_dias_creacion = 0
+if not df_post_ganados_real.empty:
+    # Agrupamos por origen para obtener el primer deal de cada lead que terminó en éxito
+    df_primeros = df_post_ganados_real.groupby("origen_deal_id").agg({
+        "deal_created_date": "min",
+        "origen_created_date": "first"
+    }).reset_index()
+    
+    # Calculamos la diferencia en días
+    if not df_primeros.empty:
+        df_primeros["delta_days"] = (df_primeros["deal_created_date"] - df_primeros["origen_created_date"]).dt.days
+        avg_dias_creacion = df_primeros["delta_days"].mean()
 
 st.subheader("🏆 Impacto Comercial (Cierres Reales)")
-c_imp1, c_imp2, c_imp3 = st.columns(3)
+c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
 
 with c_imp1: display_kpi("Deals Ganados (Ventas)", f"{deals_ganados_count}", "Cierre Ganado Real")
 with c_imp2: display_kpi("Monto Ganado (USD)", f"${monto_ganado_total:,.2f}", "Total Cerrado")
-with c_imp3: display_kpi("Duración Leads Origen", f"{val_kpi_duracion:,.1f}", "Meses Acumulados")
+with c_imp3: display_kpi("Tasa de Multiplicación", f"{tasa_multiplicacion:.2f}", "Deals por Lead Exitoso")
+with c_imp4: display_kpi("Tiempo Promedio 1er Deal", f"{avg_dias_creacion:.0f} días", "Desde creación Lead")
 
 # -----------------------------------------------------------------------------
 # TABLA DE DETALLE 2 (EXPANDER - GANADOS)
 # -----------------------------------------------------------------------------
 with st.expander("🔍 Ver Detalle de Deals Ganados (Ventas)"):
-    # Mostramos detalles relevantes para validar los 31 deals
     cols_show_ganados = ["deal_name", "deal_amount", "pipeline_comercial", "origen_deal_name"]
     
     st.dataframe(
