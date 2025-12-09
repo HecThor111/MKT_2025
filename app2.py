@@ -9,7 +9,6 @@ import plotly.express as px
 # -------------------------
 # Ajusta el nombre si tu archivo se llama distinto
 CSV_FILE = "bd_final.csv"
-TASA_CAMBIO = 18.19  # Tasa solicitada
 
 st.set_page_config(
     page_title="Dashboard HubSpot – Marketing → Negocios posteriores (2025)",
@@ -17,7 +16,7 @@ st.set_page_config(
 )
 
 st.title("📊 HubSpot – Marketing → Negocios posteriores (2025)")
-st.caption(f"Origen de datos: {CSV_FILE} | Visualizando todo en USD (Tasa conversión: {TASA_CAMBIO} MXN/USD)")
+st.caption(f"Origen de datos: {CSV_FILE}")
 
 
 # -------------------------
@@ -68,24 +67,6 @@ def load_data(path: str) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
-    # -----------------------------------------------------------
-    # LÓGICA DE CONVERSIÓN DE MONEDA (MXN -> USD)
-    # -----------------------------------------------------------
-    # Convertimos montos de Origen
-    if "origen_currency" in df.columns and "origen_amount" in df.columns:
-        # Detectamos MXN
-        mask_mxn_orig = df["origen_currency"].astype(str).str.contains("MXN", case=False, na=False)
-        # Convertimos
-        df.loc[mask_mxn_orig, "origen_amount"] = df.loc[mask_mxn_orig, "origen_amount"] / TASA_CAMBIO
-    
-    # Convertimos montos de Posteriores
-    if "deal_currency" in df.columns and "deal_amount" in df.columns:
-        # Detectamos MXN
-        mask_mxn_deal = df["deal_currency"].astype(str).str.contains("MXN", case=False, na=False)
-        # Convertimos
-        df.loc[mask_mxn_deal, "deal_amount"] = df.loc[mask_mxn_deal, "deal_amount"] / TASA_CAMBIO
-    # -----------------------------------------------------------
-
     # Pipelines y etapas "bonitos"
     df["pipeline_marketing"] = df.get("origen_pipeline_label", "").fillna("").astype(str)
     df["pipeline_comercial"] = df.get("deal_pipeline_label", "").fillna("").astype(str)
@@ -113,8 +94,6 @@ def load_data(path: str) -> pd.DataFrame:
         "deal_unidad_de_negocio_asignada",
         "deal_producto_catalogo",
         "deal_due_o_del_deal",
-        "deal_name", # Nos aseguramos que lea el nombre real del negocio
-        "origen_deal_name"
     ]
     for col in text_cols:
         if col in df.columns:
@@ -228,90 +207,28 @@ df_post_from_g_unique = (
 )
 
 # -------------------------
-# NUEVA SECCION PRINCIPAL: POSTERIORES ABIERTOS Y PERDIDOS
+# MÉTRICAS GENERALES (fila 1)
 # -------------------------
-# Calculamos subsets
-df_post_abiertos = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Abierto"]
-df_post_perdidos = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Perdido"]
-
-# KPIs Nuevos
-kpi_abiertos_cant = df_post_abiertos["deal_id"].nunique()
-kpi_abiertos_monto = df_post_abiertos["deal_amount"].sum()
-kpi_perdidos_cant = df_post_perdidos["deal_id"].nunique()
-kpi_perdidos_monto = df_post_perdidos["deal_amount"].sum()
-
-st.markdown("### 🎯 Estado de Negocios Posteriores (Abiertos y Perdidos)")
-col_new1, col_new2, col_new3, col_new4 = st.columns(4)
-col_new1.metric("Negocios Posteriores Abiertos", f"{kpi_abiertos_cant}")
-col_new2.metric("Monto Abierto (USD)", f"${kpi_abiertos_monto:,.2f}")
-col_new3.metric("Negocios Posteriores Perdidos", f"{kpi_perdidos_cant}")
-col_new4.metric("Monto Perdido (USD)", f"${kpi_perdidos_monto:,.2f}")
-
-# Tabla Detalle (Expandible)
-with st.expander("Ver detalle de empresas (Abiertos y Perdidos)", expanded=True):
-    # Unimos para la tabla
-    df_detalle = pd.concat([df_post_abiertos, df_post_perdidos])
-    if not df_detalle.empty:
-        # Seleccionamos columnas y usamos deal_name que viene del CSV
-        cols_table = ["deal_name", "estado_comercial", "etapa_comercial", "deal_amount", "pipeline_comercial"]
-        
-        # Renombrar para que se vea limpio en pantalla
-        df_view = df_detalle[cols_table].rename(columns={
-            "deal_name": "Empresa / Negocio",
-            "estado_comercial": "Estado",
-            "etapa_comercial": "Etapa",
-            "deal_amount": "Monto (USD)",
-            "pipeline_comercial": "Pipeline"
-        }).sort_values(["Estado", "Monto (USD)"], ascending=[True, False])
-
-        st.dataframe(
-            df_view,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Monto (USD)": st.column_config.NumberColumn(format="$%.2f")
-            }
-        )
-    else:
-        st.info("No hay negocios abiertos o perdidos en la selección.")
-
-st.markdown("---")
-
-
-# -------------------------
-# MÉTRICAS GENERALES (fila 2 - Antes era fila 1)
-# -------------------------
-st.markdown("### 🔢 KPIs generales del pipeline iNBest.marketing (y Ganados)")
+st.markdown("### 🔢 KPIs generales del pipeline iNBest.marketing")
 
 col1, col2, col3, col4 = st.columns(4)
 
 num_origen = df_origen_f["origen_deal_id"].nunique()
 num_post_unicos = df_post_f_unique["deal_id"].nunique()
+
+total_origen_amount = df_origen_f["origen_amount"].sum()
 total_post_amount = df_post_f_unique["deal_amount"].sum()
+
 deals_post_por_origen = num_post_unicos / num_origen if num_origen > 0 else 0
+ticket_prom_origen = total_origen_amount / num_origen if num_origen > 0 else 0
+ticket_prom_post = total_post_amount / num_post_unicos if num_post_unicos > 0 else 0
 
 col1.metric("Negocios totales iNBest.marketing", f"{num_origen:,}")
 col2.metric("Negocios posteriores únicos", f"{num_post_unicos:,}")
-col3.metric("Monto posterior total (USD)", f"{total_post_amount:,.2f}")
+col3.metric("Monto posterior total (mix monedas)", f"{total_post_amount:,.2f}")
 col4.metric("Deals posteriores por negocio origen", f"{deals_post_por_origen:.2f}")
 
-# --- KPIs Especiales Ganados (Ahora abajo, más pequeños) ---
-st.markdown("#### Impacto desde Origen Ganado")
-colg1, colg2, colg3, colg4 = st.columns(4)
-
-num_origen_g = df_origen_g["origen_deal_id"].nunique()
-total_origen_g_amount = df_origen_g["origen_amount"].sum()
-num_post_from_g_unicos = df_post_from_g_unique["deal_id"].nunique()
-total_duracion_meses_g = df_origen_g["origen_duracion_meses"].sum()
-
-colg1.metric("Negocios GANADOS (marketing)", f"{num_origen_g:,}")
-colg2.metric("Monto total GANADO (USD)", f"{total_origen_g_amount:,.2f}")
-colg3.metric("Negocios posteriores (desde GANADOS)", f"{num_post_from_g_unicos:,}")
-colg4.metric("Suma duración contratos (meses)", f"{total_duracion_meses_g:,.1f}")
-
-
 # --- Negocios por etapa (SQL, MQL, Localizando, etc)
-# NOTA: Mantenemos esta, eliminamos la de "Estados" como pediste
 st.markdown("#### 📍 Negocios de marketing por etapa")
 if not df_origen_f.empty:
     etapa_counts = (
@@ -335,6 +252,26 @@ else:
     st.info("No hay negocios de marketing con los filtros actuales.")
 
 st.markdown("---")
+
+# -------------------------
+# KPIs ESPECIALES (GANADOS)
+# -------------------------
+st.markdown("### 🏆 KPIs especiales sobre negocios GANADOS en iNBest.marketing")
+
+colg1, colg2, colg3, colg4 = st.columns(4)
+
+num_origen_g = df_origen_g["origen_deal_id"].nunique()
+total_origen_g_amount = df_origen_g["origen_amount"].sum()
+num_post_from_g_unicos = df_post_from_g_unique["deal_id"].nunique()
+total_duracion_meses_g = df_origen_g["origen_duracion_meses"].sum()
+
+colg1.metric("Negocios GANADOS (marketing)", f"{num_origen_g:,}")
+colg2.metric("Monto total GANADO (marketing)", f"{total_origen_g_amount:,.2f}")
+colg3.metric("Negocios posteriores (desde GANADOS)", f"{num_post_from_g_unicos:,}")
+colg4.metric(
+    "Suma duración contratos (meses, GANADOS)",
+    f"{total_duracion_meses_g:,.1f}",
+)
 
 # -------------------------
 # MÉTRICAS AVANZADAS (GANADOS)
@@ -396,12 +333,11 @@ st.markdown("---")
 # -------------------------
 # DISTRIBUCIÓN DE ESTADOS
 # -------------------------
-# AQUI ELIMINE LA GRAFICA "Estados de Marketing" QUE PEDISTE QUITAR
-st.markdown("### 🧩 Distribución de estados comerciales")
-col_est1, col_est2 = st.columns([1,1]) # Solo dejo columnas para equilibrar
+st.markdown("### 🧩 Distribución de estados comerciales y de marketing")
+col_est1, col_est2 = st.columns(2)
 
 with col_est1:
-    st.markdown("**Distribución de negocios posteriores por estado comercial (monto USD)**")
+    st.markdown("**Distribución de negocios posteriores por estado comercial (monto)**")
     if not df_post_f_unique.empty:
         estado_counts_amt = (
             df_post_f_unique.groupby("estado_comercial")["deal_amount"]
@@ -419,7 +355,31 @@ with col_est1:
     else:
         st.info("No hay negocios posteriores con los filtros actuales.")
 
-# La columna 2 se queda vacía o para futuro uso porque se eliminó la gráfica solicitada
+with col_est2:
+    st.markdown("**Estados de marketing por pipeline**")
+    if not df_origen_f.empty:
+        mkt_estado = (
+            df_origen_f.groupby(["pipeline_marketing", "estado_marketing"])[
+                "origen_deal_id"
+            ]
+            .nunique()
+            .reset_index(name="num_deals")
+        )
+        fig_mkt = px.bar(
+            mkt_estado,
+            x="pipeline_marketing",
+            y="num_deals",
+            color="estado_marketing",
+            barmode="stack",
+        )
+        fig_mkt.update_layout(
+            xaxis_title="Pipeline de marketing",
+            yaxis_title="Núm. negocios",
+            margin=dict(l=10, r=10, t=30, b=80),
+        )
+        st.plotly_chart(fig_mkt, use_container_width=True)
+    else:
+        st.info("No hay negocios de origen con los filtros actuales.")
 
 st.markdown("---")
 
@@ -431,7 +391,7 @@ st.markdown("### 📆 Evolución temporal")
 col_time1, col_time2 = st.columns(2)
 
 with col_time1:
-    st.markdown("**Negocios de marketing por mes (cantidad y monto USD)**")
+    st.markdown("**Negocios de marketing por mes (cantidad y monto)**")
     if not df_origen_f.empty:
         tmp = df_origen_f.copy()
         tmp["mes"] = tmp["origen_created_date"].dt.to_period("M").dt.to_timestamp()
@@ -459,7 +419,7 @@ with col_time1:
         st.info("No hay negocios de marketing con los filtros actuales.")
 
 with col_time2:
-    st.markdown("**Negocios posteriores por mes (cantidad y monto USD)**")
+    st.markdown("**Negocios posteriores por mes (cantidad y monto)**")
     if not df_post_f_unique.empty:
         tmp = df_post_f_unique.copy()
         tmp["mes"] = tmp["deal_created_date"].dt.to_period("M").dt.to_timestamp()
@@ -602,16 +562,16 @@ col_g1, col_g2 = st.columns(2)
 
 # 1) Monto posterior por unidad de negocio (deals únicos) y moneda
 with col_g1:
-    st.markdown("**Monto total posterior por unidad de negocio (USD)**")
+    st.markdown("**Monto total posterior por unidad de negocio y moneda (deals únicos)**")
     if not df_post_f_unique.empty:
         tmp = df_post_f_unique.copy()
         tmp["deal_unidad_de_negocio_asignada"] = tmp[
             "deal_unidad_de_negocio_asignada"
         ].replace({"": "Sin dato"})
-        # tmp["deal_currency"]  <- Ya no es necesario mostrar el desglose de moneda porque todo es USD
+        tmp["deal_currency"] = tmp["deal_currency"].replace({"": "Sin moneda"})
 
         monto_por_unidad = (
-            tmp.groupby(["deal_unidad_de_negocio_asignada"])["deal_amount"]
+            tmp.groupby(["deal_unidad_de_negocio_asignada", "deal_currency"])["deal_amount"]
             .sum()
             .reset_index()
             .sort_values("deal_amount", ascending=False)
@@ -620,7 +580,7 @@ with col_g1:
             monto_por_unidad,
             x="deal_unidad_de_negocio_asignada",
             y="deal_amount",
-            # color="deal_currency", -> Eliminado para unificar color
+            color="deal_currency",
             barmode="group",
         )
         fig_owner.update_layout(
