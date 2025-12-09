@@ -185,7 +185,7 @@ def load_data(path: str) -> pd.DataFrame:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
     # -------------------------------------------------------------------------
-    # MODIFICACIÓN SOLICITADA: CONVERSIÓN DE MONEDA (MXN -> USD)
+    # CONVERSIÓN DE MONEDA (MXN -> USD)
     # -------------------------------------------------------------------------
     if "origen_currency" in df.columns and "origen_amount" in df.columns:
         mask_mxn_orig = df["origen_currency"] == "MXN"
@@ -297,10 +297,9 @@ with c_kpi3: display_kpi("Negocios Perdidos", f"{perdidos_count}", "Cierre Perdi
 with c_kpi4: display_kpi("Monto Perdido (USD)", f"${perdidos_amount:,.2f}", "No Concretado")
 
 # -----------------------------------------------------------------------------
-# TABLA DE DETALLE (EXPANDER)
+# TABLA DE DETALLE 1 (EXPANDER - ABIERTOS Y PERDIDOS)
 # -----------------------------------------------------------------------------
 with st.expander("🔍 Ver Detalle de Negocios (Abiertos y Perdidos)"):
-    # Concatenamos solo lo que nos interesa mostrar
     cols_show = ["deal_name", "etapa_comercial", "deal_amount", "estado_comercial"]
     detail_df = pd.concat([post_abiertos, post_perdidos])[cols_show].copy()
     
@@ -321,18 +320,16 @@ st.markdown("---")
 # -----------------------------------------------------------------------------
 # 6. FILA 2: KPIs SECUNDARIOS (IMPACTO COMERCIAL GANADO)
 # -----------------------------------------------------------------------------
-# --- CORRECCIÓN LÓGICA: Usar datos de Ventas Ganados Realmente ---
-# En lugar de depender de si Marketing marcó 'Ganado', buscamos los POSTERIORES que sean 'Ganados'.
+# Lógica corregida: Usar datos de Ventas Ganados Realmente
 df_post_ganados_real = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Ganado"].copy()
 
 # Cálculos reales basados en ventas cerradas
 deals_ganados_count = len(df_post_ganados_real)
 monto_ganado_total = df_post_ganados_real["deal_amount"].sum()
 
-# Para 'Negocios posteriores creados' (Duración), usamos los datos de origen de estos ganados
+# Duración Leads Origen
 ids_origen_de_ganados = df_post_ganados_real["origen_deal_id"].unique()
 df_origen_de_ganados = df_origen_f[df_origen_f["origen_deal_id"].isin(ids_origen_de_ganados)]
-# O si prefieres mantener la lógica original de duración del lead de marketing:
 val_kpi_duracion = df_origen_de_ganados["origen_duracion_meses"].sum()
 
 st.subheader("🏆 Impacto Comercial (Cierres Reales)")
@@ -341,6 +338,25 @@ c_imp1, c_imp2, c_imp3 = st.columns(3)
 with c_imp1: display_kpi("Deals Ganados (Ventas)", f"{deals_ganados_count}", "Cierre Ganado Real")
 with c_imp2: display_kpi("Monto Ganado (USD)", f"${monto_ganado_total:,.2f}", "Total Cerrado")
 with c_imp3: display_kpi("Duración Leads Origen", f"{val_kpi_duracion:,.1f}", "Meses Acumulados")
+
+# -----------------------------------------------------------------------------
+# TABLA DE DETALLE 2 (EXPANDER - GANADOS)
+# -----------------------------------------------------------------------------
+with st.expander("🔍 Ver Detalle de Deals Ganados (Ventas)"):
+    # Mostramos detalles relevantes para validar los 31 deals
+    cols_show_ganados = ["deal_name", "deal_amount", "pipeline_comercial", "origen_deal_name"]
+    
+    st.dataframe(
+        df_post_ganados_real[cols_show_ganados],
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "deal_name": "Nombre del Negocio (Venta)",
+            "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f"),
+            "pipeline_comercial": "Pipeline",
+            "origen_deal_name": "Origen (Marketing)"
+        }
+    )
 
 st.markdown("---")
 
