@@ -187,7 +187,6 @@ def load_data(path: str) -> pd.DataFrame:
     # -------------------------------------------------------------------------
     # MODIFICACIÓN SOLICITADA: CONVERSIÓN DE MONEDA (MXN -> USD)
     # -------------------------------------------------------------------------
-    # Aplicamos la conversión directamente sobre las columnas existentes
     if "origen_currency" in df.columns and "origen_amount" in df.columns:
         mask_mxn_orig = df["origen_currency"] == "MXN"
         df.loc[mask_mxn_orig, "origen_amount"] = df.loc[mask_mxn_orig, "origen_amount"] / 18.19
@@ -322,21 +321,26 @@ st.markdown("---")
 # -----------------------------------------------------------------------------
 # 6. FILA 2: KPIs SECUNDARIOS (IMPACTO COMERCIAL GANADO)
 # -----------------------------------------------------------------------------
-# --- Lógica KPIs Ganados (Movido desde el Header original) ---
-df_origen_ganados = df_origen_f[df_origen_f["estado_marketing"] == "Ganado"].copy()
-ids_ganados = df_origen_ganados["origen_deal_id"].unique()
+# --- CORRECCIÓN LÓGICA: Usar datos de Ventas Ganados Realmente ---
+# En lugar de depender de si Marketing marcó 'Ganado', buscamos los POSTERIORES que sean 'Ganados'.
+df_post_ganados_real = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Ganado"].copy()
 
-# Cálculos
-w_count = df_origen_ganados["origen_deal_id"].nunique()
-w_amount_usd = df_origen_ganados["origen_amount"].sum()
-val_kpi_posterior = df_origen_ganados["origen_duracion_meses"].sum()
+# Cálculos reales basados en ventas cerradas
+deals_ganados_count = len(df_post_ganados_real)
+monto_ganado_total = df_post_ganados_real["deal_amount"].sum()
 
-st.subheader("🏆 Impacto Comercial (Origen Ganado)")
+# Para 'Negocios posteriores creados' (Duración), usamos los datos de origen de estos ganados
+ids_origen_de_ganados = df_post_ganados_real["origen_deal_id"].unique()
+df_origen_de_ganados = df_origen_f[df_origen_f["origen_deal_id"].isin(ids_origen_de_ganados)]
+# O si prefieres mantener la lógica original de duración del lead de marketing:
+val_kpi_duracion = df_origen_de_ganados["origen_duracion_meses"].sum()
+
+st.subheader("🏆 Impacto Comercial (Cierres Reales)")
 c_imp1, c_imp2, c_imp3 = st.columns(3)
 
-with c_imp1: display_kpi("Deals Ganados (Mkt)", f"{w_count}", "Cierre Ganado")
-with c_imp2: display_kpi("Monto Ganado (USD)", f"${w_amount_usd:,.2f}", "Total Pipeline Marketing")
-with c_imp3: display_kpi("Negocios posteriores creados", f"{val_kpi_posterior:,.1f}", "Suma Negocios Posteriores")
+with c_imp1: display_kpi("Deals Ganados (Ventas)", f"{deals_ganados_count}", "Cierre Ganado Real")
+with c_imp2: display_kpi("Monto Ganado (USD)", f"${monto_ganado_total:,.2f}", "Total Cerrado")
+with c_imp3: display_kpi("Duración Leads Origen", f"{val_kpi_duracion:,.1f}", "Meses Acumulados")
 
 st.markdown("---")
 
@@ -349,8 +353,8 @@ kpi_mkt_count = df_origen_f["origen_deal_id"].nunique()
 kpi_post_total_unique = df_post_f_unique["deal_id"].nunique()
 
 col_gen1, col_gen2 = st.columns(2)
-with col_gen1: display_kpi("Total Marketing", f"{kpi_mkt_count:,}", "Todos los estados")
-with col_gen2: display_kpi("Total Posteriores", f"{kpi_post_total_unique:,}", "Todos los estados")
+with col_gen1: display_kpi("Total Leads Marketing", f"{kpi_mkt_count:,}", "Todos los estados")
+with col_gen2: display_kpi("Total Negocios Posteriores", f"{kpi_post_total_unique:,}", "Todos los estados")
 
 # -----------------------------------------------------------------------------
 # 8. GRÁFICA: NEGOCIOS POR ETAPA MKT (FUNNEL)
@@ -398,7 +402,6 @@ st.markdown("---")
 # -----------------------------------------------------------------------------
 st.subheader("🧩 Distribución de Estados")
 
-# Se eliminó la columna con la gráfica de Estados de Marketing como solicitado
 st.markdown("**Estados Comerciales (Todos los Pipelines Comerciales)**")
 if not df_post_f_unique.empty:
     # Agrupamos por pipeline comercial y estado
