@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # -----------------------------------------------------------------------------
-# 1. CONFIGURACIÓN Y ESTILO VISUAL
+# 1. CONFIGURACIÓN Y ESTILO VISUAL (CSS FUTURISTA)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Reporte Marketing 2025",
@@ -21,6 +21,7 @@ COLOR_PALETTE = ["#38bdf8", "#0ea5e9", "#6366f1", "#22d3ee", "#8b5cf6", "#ec4899
 st.markdown(
     """
     <style>
+    /* VARIABLES GLOBALES PARA ELIMINAR EL ROJO POR DEFECTO */
     :root {
         --primary-color: #38bdf8;
         --background-color: #0B0F19;
@@ -28,16 +29,36 @@ st.markdown(
         --text-color: #f0f9ff;
         --font: 'Inter', sans-serif;
     }
-    .stApp { background-color: #0B0F19; }
+
+    /* Fondo general */
+    .stApp {
+        background-color: #0B0F19;
+    }
     
-    /* Widgets Style Overrides */
-    div.stDateInput > div > div > input { color: #38bdf8; }
-    div.stMultiSelect span[data-baseweb="tag"] { background-color: #1e293b !important; border: 1px solid #38bdf8 !important; }
-    div.stMultiSelect div[data-baseweb="select"] { border-color: #38bdf8 !important; }
-    .stCheckbox div[data-testid="stMarkdownContainer"] p { color: #cbd5e1 !important; }
-    
-    /* KPI Cards */
-    div[data-testid="metric-container"] { display: none; }
+    /* SOBRESCRIBIR EL ACENTO ROJO/NARANJA DE STREAMLIT EN WIDGETS */
+    div.stDateInput > div > div > input {
+        color: #38bdf8;
+    }
+    div.stMultiSelect span[data-baseweb="tag"] {
+        background-color: #1e293b !important;
+        border: 1px solid #38bdf8 !important;
+    }
+    div.stMultiSelect div[data-baseweb="select"] {
+        border-color: #38bdf8 !important;
+    }
+    /* Checkbox y Radios */
+    .stCheckbox div[data-testid="stMarkdownContainer"] p {
+        color: #cbd5e1 !important;
+    }
+    span[data-baseweb="checkbox"] div {
+        background-color: #38bdf8 !important;
+    }
+
+    /* Estilo para las métricas (KPI Cards) */
+    div[data-testid="metric-container"] {
+        display: none; 
+    }
+
     .kpi-card {
         background: linear-gradient(145deg, #111827, #1f2937);
         border: 1px solid #6366f1;
@@ -49,60 +70,59 @@ st.markdown(
         height: 100%;
         transition: transform 0.2s;
     }
-    .kpi-card:hover { transform: translateY(-2px); border-color: #8b5cf6; }
-    .kpi-label { color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 600; }
-    .kpi-value { color: #f0f9ff; font-size: 1.8rem; font-weight: 700; text-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
-    .kpi-sub { color: #38bdf8; font-size: 0.75rem; margin-top: 4px; }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        border-color: #8b5cf6;
+    }
+    .kpi-label {
+        color: #94a3b8;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+    .kpi-value {
+        color: #f0f9ff;
+        font-size: 1.8rem;
+        font-weight: 700;
+        text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+    }
+    .kpi-sub {
+        color: #38bdf8;
+        font-size: 0.75rem;
+        margin-top: 4px;
+    }
 
-    /* Headers & Text */
-    h1, h2, h3, h4 { color: #f0f9ff !important; font-family: 'Inter', sans-serif; }
-    p, label, .stMarkdown, .stRadio label, .stCheckbox label { color: #cbd5e1 !important; }
+    /* Títulos */
+    h1, h2, h3, h4 {
+        color: #f0f9ff !important;
+        font-family: 'Inter', sans-serif;
+    }
+    p, label, .stMarkdown, .stRadio label, .stCheckbox label {
+        color: #cbd5e1 !important;
+    }
+
+    /* Tablas */
+    div[data-testid="stDataFrame"] {
+        background-color: #111827;
+        border-radius: 10px;
+        border: 1px solid #374151;
+    }
     
-    /* Tables & Sidebar */
-    div[data-testid="stDataFrame"] { background-color: #111827; border-radius: 10px; border: 1px solid #374151; }
-    section[data-testid="stSidebar"] { background-color: #0f172a; border-right: 1px solid #1e2937; }
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #0f172a;
+        border-right: 1px solid #1e2937;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
 
 # -----------------------------------------------------------------------------
-# 2. FUNCIONES HELPERS & DICCIONARIOS
+# 2. FUNCIONES HELPERS
 # -----------------------------------------------------------------------------
-
-# Diccionario de coordenadas para ciudades principales (lat, lon)
-CITY_COORDS = {
-    "ciudad de méxico": (19.4326, -99.1332),
-    "cdmx": (19.4326, -99.1332),
-    "mexico city": (19.4326, -99.1332),
-    "tlalpan": (19.2889, -99.1623),
-    "cuauthemoc": (19.4326, -99.1332),
-    "naucalpan": (19.4785, -99.2329),
-    "estado de méxico": (19.3562, -99.6462),
-    "monterrey": (25.6866, -100.3161),
-    "guadalajara": (20.6597, -103.3496),
-    "gdl": (20.6597, -103.3496),
-    "zapopan": (20.7166, -103.4005),
-    "querétaro": (20.5888, -100.3899),
-    "león": (21.1221, -101.6664),
-    "león, gto": (21.1221, -101.6664),
-    "guanajuato": (21.0190, -101.2574),
-    "merida": (20.9674, -89.5926),
-    "mérida": (20.9674, -89.5926),
-    "puebla": (19.0414, -98.2063),
-    "tijuana": (32.5149, -117.0382),
-    "cancún": (21.1619, -86.8515),
-    "bogotá": (4.7110, -74.0721),
-    "san jose": (9.9281, -84.0907), # Asumiendo Costa Rica por contexto LATAM, o San Jose CA.
-    "manzanillo": (19.0522, -104.3159),
-    "hgo": (20.1011, -98.7591) # Pachuca/Hidalgo
-}
-
-def obtener_coords(ciudad):
-    if not isinstance(ciudad, str):
-        return None, None
-    c_clean = ciudad.lower().strip()
-    return CITY_COORDS.get(c_clean, (None, None))
 
 def clasificar_estado_etapa(etapa: str) -> str:
     if not isinstance(etapa, str):
@@ -131,16 +151,6 @@ def normalizar_unidad(unidad_raw: str, pipeline_label: str) -> str:
         return unidad_raw
     return "Sin Unidad"
 
-def calcular_origen_limpio(nombre_deal: str) -> str:
-    """Extrae el texto después del guion si existe."""
-    if not isinstance(nombre_deal, str):
-        return "Desconocido"
-    if "-" in nombre_deal:
-        parts = nombre_deal.split("-", 1)
-        if len(parts) > 1:
-            return parts[1].strip()
-    return nombre_deal
-
 def display_kpi(label, value, sub_text=""):
     html = f"""
     <div class="kpi-card">
@@ -164,15 +174,22 @@ def load_data(path: str) -> pd.DataFrame:
         st.error(f"No se encontró el archivo {path}")
         return pd.DataFrame()
 
-    # 1. Limpieza automática de etapas "Localizando"
-    cols_etapa = ["origen_dealstage_label", "deal_dealstage_label"]
-    for col in cols_etapa:
+    # --- NUEVO: Limpieza de "Localizando" -> "Acercamiento" ---
+    cols_to_clean = ["origen_dealstage_label", "deal_dealstage_label"]
+    for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].replace("Localizando", "Acercamiento", regex=True)
 
-    # 2. Creación de columna 'Origen' calculada
+    # --- NUEVO: Cálculo de columna "Origen" ---
+    # Regla: Si hay guion, tomar lo que está después. Si no, valor original.
+    def calcular_origen(val):
+        s_val = str(val)
+        if "-" in s_val:
+            return s_val.split("-")[-1].strip()
+        return s_val
+    
     if "origen_deal_name" in df.columns:
-        df["Origen"] = df["origen_deal_name"].apply(calcular_origen_limpio)
+        df["Origen"] = df["origen_deal_name"].apply(calcular_origen)
     else:
         df["Origen"] = "Desconocido"
 
@@ -186,7 +203,9 @@ def load_data(path: str) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
-    # Conversión de moneda (MXN -> USD estimado)
+    # -------------------------------------------------------------------------
+    # CONVERSIÓN DE MONEDA (MXN -> USD)
+    # -------------------------------------------------------------------------
     if "origen_currency" in df.columns and "origen_amount" in df.columns:
         mask_mxn_orig = df["origen_currency"] == "MXN"
         df.loc[mask_mxn_orig, "origen_amount"] = df.loc[mask_mxn_orig, "origen_amount"] / 18.19
@@ -194,18 +213,14 @@ def load_data(path: str) -> pd.DataFrame:
     if "deal_currency" in df.columns and "deal_amount" in df.columns:
         mask_mxn_deal = df["deal_currency"] == "MXN"
         df.loc[mask_mxn_deal, "deal_amount"] = df.loc[mask_mxn_deal, "deal_amount"] / 18.19
+    # -------------------------------------------------------------------------
 
-    # Textos y Mapeos
+    # Texto
     df["pipeline_marketing"] = df.get("origen_pipeline_label", "").fillna("").astype(str)
     df["pipeline_comercial"] = df.get("deal_pipeline_label", "").fillna("").astype(str)
     df["etapa_marketing"] = df.get("origen_dealstage_label", "").fillna("").astype(str)
     df["etapa_comercial"] = df.get("deal_dealstage_label", "").fillna("").astype(str)
-    
-    # Nuevas columnas requeridas
-    df["contact_name"] = df.get("Contact_Nombre_Completo", "").fillna("Sin Nombre").astype(str)
-    df["contact_company"] = df.get("Contact_Empresa", "").fillna("Sin Empresa").astype(str)
-    df["contact_city"] = df.get("Contact_Ciudad", "").fillna("").astype(str)
-    
+
     # Estados
     df["estado_marketing"] = df["etapa_marketing"].apply(clasificar_estado_etapa)
     df["estado_comercial"] = df["etapa_comercial"].apply(clasificar_estado_etapa)
@@ -221,18 +236,19 @@ def load_data(path: str) -> pd.DataFrame:
         lambda row: normalizar_unidad(row["deal_unidad_raw"], row["pipeline_comercial"]), axis=1
     )
 
-    # Rellenar textos clave
-    cols_text = ["origen_origen_del_negocio", "origen_producto_catalogo"]
+    # Rellenar textos clave y nuevas columnas para detalle
+    cols_text = ["origen_origen_del_negocio", "origen_producto_catalogo", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "Contact_Ciudad"]
     for c in cols_text:
         if c in df.columns:
             df[c] = df[c].fillna("Sin dato").astype(str)
+        else:
+            df[c] = "Sin dato" # Fallback si no existe
             
     return df
 
 df = load_data(CSV_FILE)
 
 if df.empty:
-    st.error("El DataFrame está vacío. Verifica que 'final.csv' tenga datos.")
     st.stop()
 
 # -----------------------------------------------------------------------------
@@ -241,7 +257,7 @@ if df.empty:
 df_origen_all = df[df["tipo_negocio"] == "origen_marketing"].copy()
 df_post_all = df[df["tipo_negocio"] == "posterior_contacto"].copy()
 
-# Deduplicar origen para filtros
+# Deduplicar origen para filtros y métricas base
 df_origen_unique_all = df_origen_all.sort_values("origen_created_date").drop_duplicates(subset=["origen_deal_id"])
 
 st.sidebar.title("🚀 Filtros")
@@ -257,10 +273,8 @@ start_date, end_date = dates if isinstance(dates, tuple) and len(dates) == 2 els
 unidades_opts = sorted(df_origen_unique_all["origen_unidad_norm"].unique())
 sel_unidades = st.sidebar.multiselect("Unidad de Negocio", options=unidades_opts, default=unidades_opts)
 
-# Filtro por Columna 'Origen' calculada en lugar de 'origen_origen_del_negocio' si se prefiere, 
-# pero mantengo el original para consistencia, agregando el nuevo como opción extra si se desea.
 origen_opts = sorted(df_origen_unique_all["origen_origen_del_negocio"].unique())
-sel_origenes = st.sidebar.multiselect("Fuente del Negocio", options=origen_opts, default=origen_opts)
+sel_origenes = st.sidebar.multiselect("Origen del Negocio", options=origen_opts, default=origen_opts)
 
 # Aplicar Filtros
 mask_origen = (
@@ -281,166 +295,475 @@ df_post_f_unique = df_post_f.sort_values("deal_created_date").drop_duplicates(su
 st.title("🚀 Reporte de Leads Marketing 2025")
 
 # -----------------------------------------------------------------------------
-# 5. KPI'S & TABLAS DETALLE
+# 5. FILA 1: KPIs PRINCIPALES (ABIERTOS Y PERDIDOS POSTERIORES)
 # -----------------------------------------------------------------------------
-st.subheader("🎯 Negocios Posteriores (Pipeline)")
+st.subheader("🎯 Negocios Posteriores (Abiertos y Perdidos)")
 
-# Filtros para KPIs
+# Filtramos los datos posteriores
 post_abiertos = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Abierto"]
 post_perdidos = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Perdido"]
-post_ganados = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Ganado"]
 
-# Métricas
+# Cálculos Totales
+abiertos_count = len(post_abiertos)
+abiertos_amount = post_abiertos["deal_amount"].sum()
+
+perdidos_count = len(post_perdidos)
+perdidos_amount = post_perdidos["deal_amount"].sum()
+
 c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
-with c_kpi1: display_kpi("Negocios Abiertos", f"{len(post_abiertos)}", "En Pipeline")
-with c_kpi2: display_kpi("Negocios Ganados", f"{len(post_ganados)}", "Ventas Cerradas")
-with c_kpi3: display_kpi("Monto Ganado", f"${post_ganados['deal_amount'].sum():,.0f}", "USD")
-with c_kpi4: display_kpi("Tasa Conversión", f"{(len(post_ganados)/len(df_origen_f)*100 if len(df_origen_f)>0 else 0):.1f}%", "De Lead a Venta")
 
-# TABLA 1: ABIERTOS Y PERDIDOS
+with c_kpi1: display_kpi("Negocios Abiertos", f"{abiertos_count}", "Pipeline Comercial")
+with c_kpi2: display_kpi("Monto Abierto (USD)", f"${abiertos_amount:,.2f}", "Potencial Activo")
+with c_kpi3: display_kpi("Negocios Perdidos", f"{perdidos_count}", "Cierre Perdido")
+with c_kpi4: display_kpi("Monto Perdido (USD)", f"${perdidos_amount:,.2f}", "No Concretado")
+
+# -----------------------------------------------------------------------------
+# TABLA DE DETALLE 1 (EXPANDER - ABIERTOS Y PERDIDOS)
+# -----------------------------------------------------------------------------
 with st.expander("🔍 Ver Detalle de Negocios (Abiertos y Perdidos)"):
-    cols_required = ["origen_deal_name", "Origen", "contact_name", "contact_company", "deal_dealtype", "deal_amount", "etapa_comercial"]
+    # --- NUEVO: Agregadas columnas Contact_Nombre_Completo, Contact_Empresa, deal_dealtype, Origen ---
+    cols_show = ["deal_name", "Origen", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "etapa_comercial", "deal_amount", "estado_comercial"]
+    detail_df = pd.concat([post_abiertos, post_perdidos])[cols_show].copy()
     
-    # Combinar y filtrar
-    df_detail_1 = pd.concat([post_abiertos, post_perdidos])
-    
-    if not df_detail_1.empty:
-        # Asegurar que existan las columnas, si no rellenar
-        for c in cols_required:
-            if c not in df_detail_1.columns: df_detail_1[c] = "-"
-            
-        st.dataframe(
-            df_detail_1[cols_required],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "origen_deal_name": "Nombre Lead (Original)",
-                "Origen": "Origen (Campaña/Evento)",
-                "contact_name": "Contacto",
-                "contact_company": "Empresa",
-                "deal_dealtype": "Tipo Deal",
-                "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f"),
-                "etapa_comercial": "Etapa Actual"
-            }
-        )
-    else:
-        st.info("No hay negocios abiertos o perdidos con los filtros actuales.")
-
-# TABLA 2: GANADOS
-with st.expander("🏆 Ver Detalle de Deals Ganados (Ventas)"):
-    if not post_ganados.empty:
-        for c in cols_required:
-            if c not in post_ganados.columns: post_ganados[c] = "-"
-            
-        st.dataframe(
-            post_ganados[cols_required],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "origen_deal_name": "Nombre Lead (Original)",
-                "Origen": "Origen (Campaña/Evento)",
-                "contact_name": "Contacto",
-                "contact_company": "Empresa",
-                "deal_dealtype": "Tipo Deal",
-                "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f"),
-                "etapa_comercial": "Etapa Final"
-            }
-        )
-    else:
-        st.info("No hay ventas registradas con los filtros actuales.")
+    st.dataframe(
+        detail_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "deal_name": "Nombre del Negocio",
+            "Origen": "Origen Campaña",
+            "Contact_Nombre_Completo": "Contacto",
+            "Contact_Empresa": "Empresa",
+            "deal_dealtype": "Tipo Deal",
+            "etapa_comercial": "Etapa",
+            "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f"),
+            "estado_comercial": "Estado"
+        }
+    )
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 6. MAPA INTERACTIVO DE CIUDADES
+# 6. FILA 2: KPIs SECUNDARIOS (IMPACTO COMERCIAL GANADO + NUEVOS INDICADORES)
 # -----------------------------------------------------------------------------
-st.subheader("🌎 Distribución Geográfica de Leads")
+# Usamos los ganados reales de ventas
+df_post_ganados_real = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Ganado"].copy()
 
-# Preparar datos para el mapa
+# 1. Total Deals y Monto
+deals_ganados_count = len(df_post_ganados_real)
+monto_ganado_total = df_post_ganados_real["deal_amount"].sum()
+
+# 2. Tasa de Multiplicación (Deals Ganados / Leads de Origen Únicos)
+unique_origins_count = df_post_ganados_real["origen_deal_id"].nunique()
+tasa_multiplicacion = deals_ganados_count / unique_origins_count if unique_origins_count > 0 else 0
+
+# 3. Tiempo Promedio de Creación del Primer Negocio
+avg_dias_creacion = 0
+if not df_post_ganados_real.empty:
+    # Agrupamos por origen para obtener el primer deal de cada lead que terminó en éxito
+    df_primeros = df_post_ganados_real.groupby("origen_deal_id").agg({
+        "deal_created_date": "min",
+        "origen_created_date": "first"
+    }).reset_index()
+    
+    # Calculamos la diferencia en días
+    if not df_primeros.empty:
+        df_primeros["delta_days"] = (df_primeros["deal_created_date"] - df_primeros["origen_created_date"]).dt.days
+        avg_dias_creacion = df_primeros["delta_days"].mean()
+
+st.subheader("🏆 Impacto Comercial (Cierres Reales)")
+c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
+
+with c_imp1: display_kpi("Deals Ganados (Ventas)", f"{deals_ganados_count}", "Cierre Ganado Real")
+with c_imp2: display_kpi("Monto Ganado (USD)", f"${monto_ganado_total:,.2f}", "Total Cerrado")
+with c_imp3: display_kpi("Tasa de Multiplicación", f"{tasa_multiplicacion:.2f}", "Deals por Lead Exitoso")
+with c_imp4: display_kpi("Tiempo Promedio 1er Deal", f"{avg_dias_creacion:.0f} días", "Desde creación Lead")
+
+# -----------------------------------------------------------------------------
+# TABLA DE DETALLE 2 (EXPANDER - GANADOS)
+# -----------------------------------------------------------------------------
+with st.expander("🔍 Ver Detalle de Deals Ganados (Ventas)"):
+    # --- NUEVO: Agregadas columnas Contact_Nombre_Completo, Contact_Empresa, deal_dealtype, Origen ---
+    cols_show_ganados = ["deal_name", "Origen", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "deal_amount", "pipeline_comercial"]
+    
+    st.dataframe(
+        df_post_ganados_real[cols_show_ganados],
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "deal_name": "Nombre del Negocio (Venta)",
+            "Origen": "Origen Campaña",
+            "Contact_Nombre_Completo": "Contacto",
+            "Contact_Empresa": "Empresa",
+            "deal_dealtype": "Tipo Deal",
+            "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f"),
+            "pipeline_comercial": "Pipeline"
+        }
+    )
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 7. KPI'S GENERALES (SOLO VOLUMEN)
+# -----------------------------------------------------------------------------
+st.subheader("📡 Métricas Generales (Todo el Pipeline)")
+
+kpi_mkt_count = df_origen_f["origen_deal_id"].nunique()
+kpi_post_total_unique = df_post_f_unique["deal_id"].nunique()
+
+col_gen1, col_gen2 = st.columns(2)
+with col_gen1: display_kpi("Total Leads Marketing", f"{kpi_mkt_count:,}", "Todos los estados")
+with col_gen2: display_kpi("Total Negocios Posteriores", f"{kpi_post_total_unique:,}", "Todos los estados")
+
+# -----------------------------------------------------------------------------
+# 8. GRÁFICA: NEGOCIOS POR ETAPA MKT (FUNNEL)
+# -----------------------------------------------------------------------------
+st.markdown("### 🧬 Negocios de Marketing por Etapa")
 if not df_origen_f.empty:
-    # Agrupar por ciudad
-    city_counts = df_origen_f["contact_city"].value_counts().reset_index()
-    city_counts.columns = ["ciudad", "conteo"]
+    etapa_counts = (
+        df_origen_f.groupby("etapa_marketing")["origen_deal_id"]
+        .nunique()
+        .reset_index(name="num_deals")
+        .sort_values("num_deals", ascending=False)
+    )
     
-    # Obtener coordenadas
-    coords = city_counts["ciudad"].apply(obtener_coords)
-    city_counts["lat"] = coords.apply(lambda x: x[0])
-    city_counts["lon"] = coords.apply(lambda x: x[1])
+    # Escala
+    max_val = etapa_counts["num_deals"].max()
     
-    # Filtrar ciudades sin coordenadas conocidas
-    map_data = city_counts.dropna(subset=["lat", "lon"])
+    fig_etapas = px.bar(
+        etapa_counts, x="etapa_marketing", y="num_deals",
+        text="num_deals",
+        color_discrete_sequence=[COLOR_PALETTE[0]]
+    )
     
-    if not map_data.empty:
-        col_map1, col_map2 = st.columns([3, 1])
-        
-        with col_map1:
-            # Mapa con Plotly Scatter Mapbox/Geo
-            fig_map = px.scatter_mapbox(
-                map_data,
-                lat="lat",
-                lon="lon",
-                size="conteo",
-                hover_name="ciudad",
-                hover_data={"conteo": True, "lat": False, "lon": False},
-                color="conteo",
-                color_continuous_scale=px.colors.sequential.Plasma,
-                size_max=30,
-                zoom=3.5,
-                center={"lat": 23.6345, "lon": -102.5528} # Centro de México
-            )
-            fig_map.update_layout(
-                mapbox_style="carto-darkmatter",
-                margin={"r":0,"t":0,"l":0,"b":0},
-                height=500,
-                paper_bgcolor="rgba(0,0,0,0)"
-            )
-            st.plotly_chart(fig_map, use_container_width=True)
-            
-        with col_map2:
-            st.markdown("**Top Ciudades**")
-            st.dataframe(
-                map_data[["ciudad", "conteo"]].head(10),
-                hide_index=True,
-                use_container_width=True
-            )
-            st.caption(f"*Se muestran {len(map_data)} ciudades identificadas.")
-    else:
-        st.warning("No se pudieron geolocalizar las ciudades disponibles.")
+    # Configuración de etiquetas fuera
+    fig_etapas.update_traces(
+        textposition='outside', 
+        textfont=dict(color='white'),
+        cliponaxis=False
+    )
+    
+    fig_etapas.update_layout(
+        xaxis_title="Etapa", 
+        yaxis_title="Deals",
+        template="plotly_dark", 
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis=dict(range=[0, max_val * 1.2]) 
+    )
+    st.plotly_chart(fig_etapas, use_container_width=True)
 else:
-    st.info("Sin datos para mostrar en el mapa.")
+    st.info("Sin datos de marketing.")
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 7. GRÁFICAS ADICIONALES (VOLUMEN Y FUNNEL)
+# 9. DISTRIBUCIÓN DE ESTADOS (MODIFICADO: SOLO COMERCIAL)
 # -----------------------------------------------------------------------------
+st.subheader("🧩 Distribución de Estados")
+
+st.markdown("**Estados Comerciales (Todos los Pipelines Comerciales)**")
+if not df_post_f_unique.empty:
+    # Agrupamos por pipeline comercial y estado
+    com_estado = (
+        df_post_f_unique.groupby(["pipeline_comercial", "estado_comercial"])["deal_id"]
+        .nunique()
+        .reset_index(name="num_deals")
+    )
+    
+    fig_com = px.bar(
+        com_estado, x="pipeline_comercial", y="num_deals",
+        color="estado_comercial", barmode="stack",
+        color_discrete_sequence=COLOR_PALETTE
+    )
+    fig_com.update_layout(
+        template="plotly_dark", 
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="Pipeline", yaxis_title="Deals"
+    )
+    fig_com.update_traces(marker=dict(opacity=1.0))
+    st.plotly_chart(fig_com, use_container_width=True)
+else:
+    st.info("No hay negocios posteriores.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 10. EVOLUCIÓN TEMPORAL
+# -----------------------------------------------------------------------------
+st.subheader("📅 Evolución Temporal")
+
+col_time1, col_time2 = st.columns(2)
+
+with col_time1:
+    st.markdown("**Negocios de marketing por mes**")
+    if not df_origen_f.empty:
+        tmp = df_origen_f.copy()
+        tmp["mes"] = tmp["origen_created_date"].dt.to_period("M").dt.to_timestamp()
+        evo = tmp.groupby("mes")["origen_deal_id"].nunique().reset_index(name="num_negocios")
+        
+        fig_evo = px.bar(
+            evo, x="mes", y="num_negocios",
+            color_discrete_sequence=[COLOR_PALETTE[1]]
+        )
+        fig_evo.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Mes", yaxis_title="Deals Mkt")
+        st.plotly_chart(fig_evo, use_container_width=True)
+    else:
+        st.info("Sin datos.")
+
+with col_time2:
+    st.markdown("**Negocios posteriores por mes**")
+    if not df_post_f_unique.empty:
+        tmp = df_post_f_unique.copy()
+        tmp["mes"] = tmp["deal_created_date"].dt.to_period("M").dt.to_timestamp()
+        evo2 = tmp.groupby("mes")["deal_id"].nunique().reset_index(name="num_negocios")
+
+        fig_evo2 = px.bar(
+            evo2, x="mes", y="num_negocios",
+            color_discrete_sequence=[COLOR_PALETTE[3]]
+        )
+        fig_evo2.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Mes", yaxis_title="Deals Post")
+        st.plotly_chart(fig_evo2, use_container_width=True)
+    else:
+        st.info("Sin datos.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 11. POR UNIDAD DE NEGOCIO (SIN MIX / SIN PRODUCTO)
+# -----------------------------------------------------------------------------
+st.subheader("🥧 Distribución por Unidad de Negocio (Marketing)")
+
+if not df_origen_f.empty:
+    mix_unidad = df_origen_f.groupby("origen_unidad_norm")["origen_deal_id"].nunique().reset_index(name="count")
+    fig_mix_u = px.pie(
+        mix_unidad, names="origen_unidad_norm", values="count",
+        hole=0.4, color_discrete_sequence=COLOR_PALETTE
+    )
+    fig_mix_u.update_layout(template="plotly_dark", margin=dict(t=0,b=0,l=0,r=0))
+    st.plotly_chart(fig_mix_u, use_container_width=True)
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 12. TABLA RESUMEN POR NEGOCIO ORIGEN (SIN MONTOS)
+# -----------------------------------------------------------------------------
+st.subheader("📌 Resumen Detallado por Negocio Marketing")
+
+if not df_origen_f.empty:
+    # Preparar tabla base
+    base = df_origen_f[["origen_deal_id", "origen_deal_name", "origen_created_date", "pipeline_marketing", 
+                        "etapa_marketing", "estado_marketing", "origen_unidad_norm"]].copy()
+    
+    # Agregar datos posteriores (solo conteo)
+    agg_post = df_post_f.groupby("origen_deal_id").agg(
+        num_post=("deal_id", "nunique")
+    ).reset_index()
+
+    resumen = base.merge(agg_post, on="origen_deal_id", how="left")
+    resumen["num_post"] = resumen["num_post"].fillna(0).astype(int)
+
+    st.dataframe(
+        resumen.sort_values("num_post", ascending=False),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "origen_created_date": st.column_config.DateColumn("Fecha"),
+        }
+    )
+else:
+    st.info("Sin datos.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 13. INSIGHTS VISUALES (SIN CLASIFICACIÓN MONEDA)
+# -----------------------------------------------------------------------------
+st.subheader("📈 Insights Visuales")
+
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
-    st.markdown("### 🧬 Funnel Marketing")
-    if not df_origen_f.empty:
-        etapa_counts = df_origen_f["etapa_marketing"].value_counts().reset_index()
-        etapa_counts.columns = ["etapa", "count"]
-        
-        fig_funnel = px.funnel(
-            etapa_counts, x="count", y="etapa",
-            color_discrete_sequence=[COLOR_PALETTE[0]]
+    st.markdown("**Deals Posteriores por Unidad Destino**")
+    if not df_post_f_unique.empty:
+        # Agrupación solo por unidad, sin moneda
+        deals_u = df_post_f_unique.groupby("deal_unidad_norm")["deal_id"].nunique().reset_index(name="count").sort_values("count", ascending=False)
+        fig_ins1 = px.bar(
+            deals_u, x="deal_unidad_norm", y="count", 
+            text="count",
+            color_discrete_sequence=[COLOR_PALETTE[2]]
         )
-        fig_funnel.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_funnel, use_container_width=True)
+        fig_ins1.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Unidad", yaxis_title="Num Deals")
+        st.plotly_chart(fig_ins1, use_container_width=True)
+    else:
+        st.info("Sin datos.")
 
 with col_g2:
-    st.markdown("### 🥧 Origen (Campaña)")
-    if not df_origen_f.empty:
-        # Usamos la nueva columna calculada 'Origen'
-        origen_counts = df_origen_f["Origen"].value_counts().reset_index().head(10)
-        origen_counts.columns = ["origen_clean", "count"]
-        
-        fig_pie = px.pie(
-            origen_counts, values="count", names="origen_clean",
-            hole=0.4, color_discrete_sequence=COLOR_PALETTE
+    st.markdown("**Cantidad de Deals Posteriores por Pipeline**")
+    if not df_post_f_unique.empty:
+        deals_pipe = df_post_f_unique.groupby("pipeline_comercial")["deal_id"].nunique().reset_index(name="count").sort_values("count", ascending=False)
+        fig_ins2 = px.bar(
+            deals_pipe, x="pipeline_comercial", y="count",
+            text="count",
+            color_discrete_sequence=[COLOR_PALETTE[4]]
         )
-        fig_pie.update_layout(template="plotly_dark")
-        st.plotly_chart(fig_pie, use_container_width=True)
+        fig_ins2.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Pipeline", yaxis_title="Num Deals")
+        st.plotly_chart(fig_ins2, use_container_width=True)
+    else:
+        st.info("Sin datos.")
 
-st.markdown("<br><div style='text-align: center; color: #475569;'>Desarrollado para actualización 2025 🚀</div>", unsafe_allow_html=True)
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 14. NUEVO: MAPA INTERACTIVO DE CIUDADES
+# -----------------------------------------------------------------------------
+st.subheader("🗺️ Origen Geográfico de Leads (Por Ciudad)")
+
+# Diccionario manual de coordenadas
+city_coords = {
+    "Ciudad de México": [19.4326, -99.1332],
+    "CDMX": [19.4326, -99.1332],
+    "Ciudad de Mexico": [19.4326, -99.1332],
+    "Cuauthemoc": [19.4326, -99.1332], 
+    "Tlalpan": [19.2890, -99.1664], 
+    "Naucalpan": [19.4792, -99.2359], 
+    "Estado de México": [19.3582, -99.6453], 
+    "Monterrey": [25.6866, -100.3161],
+    "MONTERREY": [25.6866, -100.3161],
+    "Guadalajara": [20.6597, -103.3496],
+    "GDL": [20.6597, -103.3496],
+    "Manzanillo": [19.0522, -104.3159],
+    "Merida": [20.9674, -89.5926],
+    "León": [21.1221, -101.6664],
+    "León, Gto": [21.1221, -101.6664],
+    "Guanajuato": [21.0190, -101.2574],
+    "HGO": [20.0911, -98.7624], 
+    "San Jose": [37.3382, -121.8863],
+}
+
+if not df.empty and "Contact_Ciudad" in df.columns:
+    # Filtramos leads con ciudad válida
+    df_geo = df[df["Contact_Ciudad"].isin(city_coords.keys())].copy()
+    
+    if not df_geo.empty:
+        # Agrupamos por ciudad
+        geo_counts = df_geo["Contact_Ciudad"].value_counts().reset_index()
+        geo_counts.columns = ["ciudad", "conteo"]
+        
+        # Asignamos lat/lon
+        geo_counts["lat"] = geo_counts["ciudad"].map(lambda x: city_coords[x][0])
+        geo_counts["lon"] = geo_counts["ciudad"].map(lambda x: city_coords[x][1])
+        
+        fig_map = px.scatter_mapbox(
+            geo_counts,
+            lat="lat",
+            lon="lon",
+            hover_name="ciudad",
+            hover_data={"conteo": True, "lat": False, "lon": False},
+            size="conteo",
+            color="conteo",
+            color_continuous_scale=px.colors.sequential.Plasma,
+            size_max=30,
+            zoom=3,
+            mapbox_style="carto-darkmatter"
+        )
+        
+        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=500)
+        st.plotly_chart(fig_map, use_container_width=True)
+    else:
+        st.info("No hay datos geográficos suficientes para mostrar el mapa.")
+else:
+    st.info("Columna de ciudad no disponible.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 15. SANKEY
+# -----------------------------------------------------------------------------
+st.subheader("🔀 Flujo: Origen ➡ Unidad Destino")
+
+check_sankey_mkt = st.checkbox("Solo origen iNBest.marketing", value=True)
+df_sankey = df_post_f.copy()
+if check_sankey_mkt:
+    df_sankey = df_sankey[df_sankey["pipeline_marketing"] == "iNBest.marketing"]
+
+if not df_sankey.empty:
+    sankey_g = df_sankey.groupby(["origen_origen_del_negocio", "deal_unidad_norm"])["deal_id"].nunique().reset_index(name="value")
+    
+    all_sources = list(sankey_g["origen_origen_del_negocio"].unique())
+    all_targets = list(sankey_g["deal_unidad_norm"].unique())
+    all_nodes = all_sources + all_targets
+    node_map = {node: i for i, node in enumerate(all_nodes)}
+    
+    link_source = sankey_g["origen_origen_del_negocio"].map(node_map).tolist()
+    link_target = sankey_g["deal_unidad_norm"].map(node_map).tolist()
+    link_value = sankey_g["value"].tolist()
+    
+    fig_san = go.Figure(data=[go.Sankey(
+        node=dict(
+            pad=15, thickness=20, line=dict(color="black", width=0.5),
+            label=all_nodes, color=["#38bdf8"] * len(all_nodes)
+        ),
+        link=dict(
+            source=link_source, target=link_target, value=link_value,
+            color="rgba(99, 102, 241, 0.3)"
+        )
+    )])
+    fig_san.update_layout(template="plotly_dark", height=500, margin=dict(l=10,r=10,t=30,b=10))
+    st.plotly_chart(fig_san, use_container_width=True)
+else:
+    st.info("No hay datos suficientes para el diagrama de flujo.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 16. DESGLOSE (SOLO CONTEO DE DEALS - SIN MONTOS)
+# -----------------------------------------------------------------------------
+st.subheader("📊 Desglose por pipeline y etapa comercial")
+
+if df_post_f.empty:
+    st.info("No hay datos posteriores con los filtros actuales.")
+else:
+    col_t1, col_t2 = st.columns(2)
+
+    with col_t1:
+        st.markdown("**Top pipelines comerciales (por cantidad)**")
+        top_pipelines = (
+            df_post_f.groupby("pipeline_comercial")
+            .agg(
+                num_deals=("deal_id", "nunique"),
+            )
+            .reset_index()
+            .sort_values("num_deals", ascending=False)
+        )
+        st.dataframe(
+            top_pipelines,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with col_t2:
+        st.markdown("**Detalle de etapas dentro de un pipeline comercial**")
+        pipelines_disp = sorted(df_post_f["pipeline_comercial"].unique())
+        pipeline_sel = st.selectbox(
+            "Selecciona pipeline comercial",
+            options=pipelines_disp,
+        )
+
+        df_etapas = df_post_f[df_post_f["pipeline_comercial"] == pipeline_sel]
+
+        etapas = (
+            df_etapas.groupby("etapa_comercial")
+            .agg(
+                num_deals=("deal_id", "nunique"),
+            )
+            .reset_index()
+            .sort_values("num_deals", ascending=False)
+        )
+
+        st.dataframe(
+            etapas,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
