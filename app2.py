@@ -174,13 +174,13 @@ def load_data(path: str) -> pd.DataFrame:
         st.error(f"No se encontró el archivo {path}")
         return pd.DataFrame()
 
-    # --- NUEVO: Limpieza de "Localizando" -> "Acercamiento" ---
+    # --- Limpieza de "Localizando" -> "Acercamiento" ---
     cols_to_clean = ["origen_dealstage_label", "deal_dealstage_label"]
     for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].replace("Localizando", "Acercamiento", regex=True)
 
-    # --- NUEVO: Cálculo de columna "Origen" ---
+    # --- Cálculo de columna "Origen" ---
     # Regla: Si hay guion, tomar lo que está después. Si no, valor original.
     def calcular_origen(val):
         s_val = str(val)
@@ -321,7 +321,7 @@ with c_kpi4: display_kpi("Monto Perdido (USD)", f"${perdidos_amount:,.2f}", "No 
 # TABLA DE DETALLE 1 (EXPANDER - ABIERTOS Y PERDIDOS)
 # -----------------------------------------------------------------------------
 with st.expander("🔍 Ver Detalle de Negocios (Abiertos y Perdidos)"):
-    # --- NUEVO: Agregadas columnas Contact_Nombre_Completo, Contact_Empresa, deal_dealtype, Origen ---
+    # Columnas nuevas agregadas
     cols_show = ["deal_name", "Origen", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "etapa_comercial", "deal_amount", "estado_comercial"]
     detail_df = pd.concat([post_abiertos, post_perdidos])[cols_show].copy()
     
@@ -383,7 +383,7 @@ with c_imp4: display_kpi("Tiempo Promedio 1er Deal", f"{avg_dias_creacion:.0f} d
 # TABLA DE DETALLE 2 (EXPANDER - GANADOS)
 # -----------------------------------------------------------------------------
 with st.expander("🔍 Ver Detalle de Deals Ganados (Ventas)"):
-    # --- NUEVO: Agregadas columnas Contact_Nombre_Completo, Contact_Empresa, deal_dealtype, Origen ---
+    # Columnas nuevas agregadas
     cols_show_ganados = ["deal_name", "Origen", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "deal_amount", "pipeline_comercial"]
     
     st.dataframe(
@@ -614,7 +614,7 @@ with col_g2:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 14. NUEVO: MAPA INTERACTIVO DE CIUDADES
+# 14. MAPA INTERACTIVO DE CIUDADES
 # -----------------------------------------------------------------------------
 st.subheader("🗺️ Origen Geográfico de Leads (Por Ciudad)")
 
@@ -677,9 +677,9 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 15. SANKEY
+# 15. SANKEY (MODIFICADO: ORIGEN POR CAMPAÑA/NEGOCIO)
 # -----------------------------------------------------------------------------
-st.subheader("🔀 Flujo: Origen ➡ Unidad Destino")
+st.subheader("🔀 Flujo: Origen Campaña ➡ Unidad Destino")
 
 check_sankey_mkt = st.checkbox("Solo origen iNBest.marketing", value=True)
 df_sankey = df_post_f.copy()
@@ -687,14 +687,15 @@ if check_sankey_mkt:
     df_sankey = df_sankey[df_sankey["pipeline_marketing"] == "iNBest.marketing"]
 
 if not df_sankey.empty:
-    sankey_g = df_sankey.groupby(["origen_origen_del_negocio", "deal_unidad_norm"])["deal_id"].nunique().reset_index(name="value")
+    # AQUI ESTA EL CAMBIO: Usamos "Origen" en vez de "origen_origen_del_negocio"
+    sankey_g = df_sankey.groupby(["Origen", "deal_unidad_norm"])["deal_id"].nunique().reset_index(name="value")
     
-    all_sources = list(sankey_g["origen_origen_del_negocio"].unique())
+    all_sources = list(sankey_g["Origen"].unique())
     all_targets = list(sankey_g["deal_unidad_norm"].unique())
     all_nodes = all_sources + all_targets
     node_map = {node: i for i, node in enumerate(all_nodes)}
     
-    link_source = sankey_g["origen_origen_del_negocio"].map(node_map).tolist()
+    link_source = sankey_g["Origen"].map(node_map).tolist()
     link_target = sankey_g["deal_unidad_norm"].map(node_map).tolist()
     link_value = sankey_g["value"].tolist()
     
