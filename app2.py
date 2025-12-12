@@ -21,7 +21,7 @@ COLOR_PALETTE = ["#38bdf8", "#0ea5e9", "#6366f1", "#22d3ee", "#8b5cf6", "#ec4899
 st.markdown(
     """
     <style>
-    /* VARIABLES GLOBALES PARA ELIMINAR EL ROJO POR DEFECTO */
+    /* VARIABLES GLOBALES */
     :root {
         --primary-color: #38bdf8;
         --background-color: #0B0F19;
@@ -35,7 +35,7 @@ st.markdown(
         background-color: #0B0F19;
     }
     
-    /* SOBRESCRIBIR EL ACENTO ROJO/NARANJA DE STREAMLIT EN WIDGETS */
+    /* WIDGETS */
     div.stDateInput > div > div > input {
         color: #38bdf8;
     }
@@ -46,7 +46,6 @@ st.markdown(
     div.stMultiSelect div[data-baseweb="select"] {
         border-color: #38bdf8 !important;
     }
-    /* Checkbox y Radios */
     .stCheckbox div[data-testid="stMarkdownContainer"] p {
         color: #cbd5e1 !important;
     }
@@ -54,7 +53,7 @@ st.markdown(
         background-color: #38bdf8 !important;
     }
 
-    /* Estilo para las métricas (KPI Cards) */
+    /* KPI Cards */
     div[data-testid="metric-container"] {
         display: none; 
     }
@@ -94,7 +93,7 @@ st.markdown(
         margin-top: 4px;
     }
 
-    /* Títulos */
+    /* Textos */
     h1, h2, h3, h4 {
         color: #f0f9ff !important;
         font-family: 'Inter', sans-serif;
@@ -180,13 +179,29 @@ def load_data(path: str) -> pd.DataFrame:
         if col in df.columns:
             df[col] = df[col].replace("Localizando", "Acercamiento", regex=True)
 
-    # --- Cálculo de columna "Origen" ---
-    # Regla: Si hay guion, tomar lo que está después. Si no, valor original.
+    # --- Cálculo de columna "Origen" MEJORADO ---
     def calcular_origen(val):
         s_val = str(val)
-        if "-" in s_val:
-            return s_val.split("-")[-1].strip()
-        return s_val
+        if "-" not in s_val:
+            return s_val.strip()
+        
+        # Dividir por guiones
+        parts = [p.strip() for p in s_val.split("-")]
+        
+        # Lista de palabras a ignorar si están al final (locations, generic terms)
+        ignore_list = [
+            "GDL", "CDMX", "MX", "USA", "LATAM", "MTY", "Bajio", "Occidente", 
+            "Agnostico", "Upselling", "Crosselling", "Base Instalada", 
+            "General", "Página Web"
+        ]
+        
+        candidate = parts[-1]
+        
+        # Si la última parte está en la lista negra y hay más partes, tomamos la penúltima
+        if candidate in ignore_list and len(parts) > 1:
+            return parts[-2]
+        
+        return candidate
     
     if "origen_deal_name" in df.columns:
         df["Origen"] = df["origen_deal_name"].apply(calcular_origen)
@@ -236,13 +251,13 @@ def load_data(path: str) -> pd.DataFrame:
         lambda row: normalizar_unidad(row["deal_unidad_raw"], row["pipeline_comercial"]), axis=1
     )
 
-    # Rellenar textos clave y nuevas columnas para detalle
+    # Rellenar textos clave
     cols_text = ["origen_origen_del_negocio", "origen_producto_catalogo", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "Contact_Ciudad"]
     for c in cols_text:
         if c in df.columns:
             df[c] = df[c].fillna("Sin dato").astype(str)
         else:
-            df[c] = "Sin dato" # Fallback si no existe
+            df[c] = "Sin dato"
             
     return df
 
@@ -257,7 +272,7 @@ if df.empty:
 df_origen_all = df[df["tipo_negocio"] == "origen_marketing"].copy()
 df_post_all = df[df["tipo_negocio"] == "posterior_contacto"].copy()
 
-# Deduplicar origen para filtros y métricas base
+# Deduplicar origen para filtros
 df_origen_unique_all = df_origen_all.sort_values("origen_created_date").drop_duplicates(subset=["origen_deal_id"])
 
 st.sidebar.title("🚀 Filtros")
@@ -295,33 +310,25 @@ df_post_f_unique = df_post_f.sort_values("deal_created_date").drop_duplicates(su
 st.title("🚀 Reporte de Leads Marketing 2025")
 
 # -----------------------------------------------------------------------------
-# 5. FILA 1: KPIs PRINCIPALES (ABIERTOS Y PERDIDOS POSTERIORES)
+# 5. FILA 1: KPIs PRINCIPALES
 # -----------------------------------------------------------------------------
 st.subheader("🎯 Negocios Posteriores (Abiertos y Perdidos)")
 
-# Filtramos los datos posteriores
 post_abiertos = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Abierto"]
 post_perdidos = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Perdido"]
 
-# Cálculos Totales
 abiertos_count = len(post_abiertos)
 abiertos_amount = post_abiertos["deal_amount"].sum()
-
 perdidos_count = len(post_perdidos)
 perdidos_amount = post_perdidos["deal_amount"].sum()
 
 c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
-
 with c_kpi1: display_kpi("Negocios Abiertos", f"{abiertos_count}", "Pipeline Comercial")
 with c_kpi2: display_kpi("Monto Abierto (USD)", f"${abiertos_amount:,.2f}", "Potencial Activo")
 with c_kpi3: display_kpi("Negocios Perdidos", f"{perdidos_count}", "Cierre Perdido")
 with c_kpi4: display_kpi("Monto Perdido (USD)", f"${perdidos_amount:,.2f}", "No Concretado")
 
-# -----------------------------------------------------------------------------
-# TABLA DE DETALLE 1 (EXPANDER - ABIERTOS Y PERDIDOS)
-# -----------------------------------------------------------------------------
 with st.expander("🔍 Ver Detalle de Negocios (Abiertos y Perdidos)"):
-    # Columnas nuevas agregadas
     cols_show = ["deal_name", "Origen", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "etapa_comercial", "deal_amount", "estado_comercial"]
     detail_df = pd.concat([post_abiertos, post_perdidos])[cols_show].copy()
     
@@ -330,43 +337,28 @@ with st.expander("🔍 Ver Detalle de Negocios (Abiertos y Perdidos)"):
         use_container_width=True,
         hide_index=True,
         column_config={
-            "deal_name": "Nombre del Negocio",
-            "Origen": "Origen Campaña",
-            "Contact_Nombre_Completo": "Contacto",
-            "Contact_Empresa": "Empresa",
-            "deal_dealtype": "Tipo Deal",
-            "etapa_comercial": "Etapa",
-            "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f"),
-            "estado_comercial": "Estado"
+            "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f")
         }
     )
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 6. FILA 2: KPIs SECUNDARIOS (IMPACTO COMERCIAL GANADO + NUEVOS INDICADORES)
+# 6. FILA 2: KPIs SECUNDARIOS (IMPACTO COMERCIAL)
 # -----------------------------------------------------------------------------
-# Usamos los ganados reales de ventas
 df_post_ganados_real = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Ganado"].copy()
 
-# 1. Total Deals y Monto
 deals_ganados_count = len(df_post_ganados_real)
 monto_ganado_total = df_post_ganados_real["deal_amount"].sum()
-
-# 2. Tasa de Multiplicación (Deals Ganados / Leads de Origen Únicos)
 unique_origins_count = df_post_ganados_real["origen_deal_id"].nunique()
 tasa_multiplicacion = deals_ganados_count / unique_origins_count if unique_origins_count > 0 else 0
 
-# 3. Tiempo Promedio de Creación del Primer Negocio
 avg_dias_creacion = 0
 if not df_post_ganados_real.empty:
-    # Agrupamos por origen para obtener el primer deal de cada lead que terminó en éxito
     df_primeros = df_post_ganados_real.groupby("origen_deal_id").agg({
         "deal_created_date": "min",
         "origen_created_date": "first"
     }).reset_index()
-    
-    # Calculamos la diferencia en días
     if not df_primeros.empty:
         df_primeros["delta_days"] = (df_primeros["deal_created_date"] - df_primeros["origen_created_date"]).dt.days
         avg_dias_creacion = df_primeros["delta_days"].mean()
@@ -379,32 +371,21 @@ with c_imp2: display_kpi("Monto Ganado (USD)", f"${monto_ganado_total:,.2f}", "T
 with c_imp3: display_kpi("Tasa de Multiplicación", f"{tasa_multiplicacion:.2f}", "Deals por Lead Exitoso")
 with c_imp4: display_kpi("Tiempo Promedio 1er Deal", f"{avg_dias_creacion:.0f} días", "Desde creación Lead")
 
-# -----------------------------------------------------------------------------
-# TABLA DE DETALLE 2 (EXPANDER - GANADOS)
-# -----------------------------------------------------------------------------
 with st.expander("🔍 Ver Detalle de Deals Ganados (Ventas)"):
-    # Columnas nuevas agregadas
     cols_show_ganados = ["deal_name", "Origen", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "deal_amount", "pipeline_comercial"]
-    
     st.dataframe(
         df_post_ganados_real[cols_show_ganados],
         use_container_width=True,
         hide_index=True,
         column_config={
-            "deal_name": "Nombre del Negocio (Venta)",
-            "Origen": "Origen Campaña",
-            "Contact_Nombre_Completo": "Contacto",
-            "Contact_Empresa": "Empresa",
-            "deal_dealtype": "Tipo Deal",
-            "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f"),
-            "pipeline_comercial": "Pipeline"
+            "deal_amount": st.column_config.NumberColumn("Monto (USD)", format="$%.2f")
         }
     )
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 7. KPI'S GENERALES (SOLO VOLUMEN)
+# 7. KPI'S GENERALES (VOLUMEN)
 # -----------------------------------------------------------------------------
 st.subheader("📡 Métricas Generales (Todo el Pipeline)")
 
@@ -416,54 +397,84 @@ with col_gen1: display_kpi("Total Leads Marketing", f"{kpi_mkt_count:,}", "Todos
 with col_gen2: display_kpi("Total Negocios Posteriores", f"{kpi_post_total_unique:,}", "Todos los estados")
 
 # -----------------------------------------------------------------------------
-# 8. GRÁFICA: NEGOCIOS POR ETAPA MKT (FUNNEL)
+# 8. GRÁFICAS: FUNNEL MKT + DEAL TYPE (MODIFICADO)
 # -----------------------------------------------------------------------------
-st.markdown("### 🧬 Negocios de Marketing por Etapa")
-if not df_origen_f.empty:
-    etapa_counts = (
-        df_origen_f.groupby("etapa_marketing")["origen_deal_id"]
-        .nunique()
-        .reset_index(name="num_deals")
-        .sort_values("num_deals", ascending=False)
-    )
-    
-    # Escala
-    max_val = etapa_counts["num_deals"].max()
-    
-    fig_etapas = px.bar(
-        etapa_counts, x="etapa_marketing", y="num_deals",
-        text="num_deals",
-        color_discrete_sequence=[COLOR_PALETTE[0]]
-    )
-    
-    # Configuración de etiquetas fuera
-    fig_etapas.update_traces(
-        textposition='outside', 
-        textfont=dict(color='white'),
-        cliponaxis=False
-    )
-    
-    fig_etapas.update_layout(
-        xaxis_title="Etapa", 
-        yaxis_title="Deals",
-        template="plotly_dark", 
-        plot_bgcolor="rgba(0,0,0,0)",
-        yaxis=dict(range=[0, max_val * 1.2]) 
-    )
-    st.plotly_chart(fig_etapas, use_container_width=True)
-else:
-    st.info("Sin datos de marketing.")
+st.markdown("### 🧬 Análisis de Etapas y Tipos")
+
+col_graph_1, col_graph_2 = st.columns(2)
+
+with col_graph_1:
+    st.markdown("**Negocios de Marketing por Etapa**")
+    if not df_origen_f.empty:
+        # CONTEO
+        etapa_counts = (
+            df_origen_f.groupby("etapa_marketing")["origen_deal_id"]
+            .nunique()
+            .reset_index(name="num_deals")
+            .sort_values("num_deals", ascending=False)
+        )
+        
+        # FILTRO: EXCLUIR ACERCAMIENTO
+        etapa_counts = etapa_counts[etapa_counts["etapa_marketing"] != "Acercamiento"]
+        
+        max_val = etapa_counts["num_deals"].max() if not etapa_counts.empty else 10
+        
+        fig_etapas = px.bar(
+            etapa_counts, x="etapa_marketing", y="num_deals",
+            text="num_deals",
+            color_discrete_sequence=[COLOR_PALETTE[0]]
+        )
+        fig_etapas.update_traces(
+            textposition='outside', 
+            textfont=dict(color='white'),
+            cliponaxis=False
+        )
+        fig_etapas.update_layout(
+            xaxis_title="Etapa", 
+            yaxis_title="Deals",
+            template="plotly_dark", 
+            plot_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(range=[0, max_val * 1.2]) 
+        )
+        st.plotly_chart(fig_etapas, use_container_width=True)
+    else:
+        st.info("Sin datos de marketing.")
+
+with col_graph_2:
+    st.markdown("**Distribución por Tipo de Deal (Deal Type)**")
+    if not df_post_f_unique.empty:
+        # Agrupar por Deal Type
+        # Llenar nulos con 'No definido' para que aparezcan en el gráfico
+        temp_dtype = df_post_f_unique["deal_dealtype"].replace({"Sin dato": "No Definido", "": "No Definido"})
+        
+        dtype_counts = temp_dtype.value_counts().reset_index()
+        dtype_counts.columns = ["Tipo de Deal", "Conteo"]
+        
+        fig_dtype = px.pie(
+            dtype_counts, 
+            names="Tipo de Deal", 
+            values="Conteo", 
+            hole=0.4,
+            color_discrete_sequence=COLOR_PALETTE
+        )
+        fig_dtype.update_layout(
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(t=0, b=0, l=0, r=0),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+        )
+        st.plotly_chart(fig_dtype, use_container_width=True)
+    else:
+        st.info("Sin datos de deals posteriores.")
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 9. DISTRIBUCIÓN DE ESTADOS (MODIFICADO: SOLO COMERCIAL)
+# 9. DISTRIBUCIÓN DE ESTADOS
 # -----------------------------------------------------------------------------
-st.subheader("🧩 Distribución de Estados")
+st.subheader("🧩 Distribución de Estados Comerciales")
 
-st.markdown("**Estados Comerciales (Todos los Pipelines Comerciales)**")
 if not df_post_f_unique.empty:
-    # Agrupamos por pipeline comercial y estado
     com_estado = (
         df_post_f_unique.groupby(["pipeline_comercial", "estado_comercial"])["deal_id"]
         .nunique()
@@ -529,7 +540,7 @@ with col_time2:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 11. POR UNIDAD DE NEGOCIO (SIN MIX / SIN PRODUCTO)
+# 11. POR UNIDAD DE NEGOCIO
 # -----------------------------------------------------------------------------
 st.subheader("🥧 Distribución por Unidad de Negocio (Marketing)")
 
@@ -545,16 +556,14 @@ if not df_origen_f.empty:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 12. TABLA RESUMEN POR NEGOCIO ORIGEN (SIN MONTOS)
+# 12. TABLA RESUMEN POR NEGOCIO ORIGEN
 # -----------------------------------------------------------------------------
 st.subheader("📌 Resumen Detallado por Negocio Marketing")
 
 if not df_origen_f.empty:
-    # Preparar tabla base
     base = df_origen_f[["origen_deal_id", "origen_deal_name", "origen_created_date", "pipeline_marketing", 
                         "etapa_marketing", "estado_marketing", "origen_unidad_norm"]].copy()
     
-    # Agregar datos posteriores (solo conteo)
     agg_post = df_post_f.groupby("origen_deal_id").agg(
         num_post=("deal_id", "nunique")
     ).reset_index()
@@ -576,7 +585,7 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 13. INSIGHTS VISUALES (SIN CLASIFICACIÓN MONEDA)
+# 13. INSIGHTS VISUALES
 # -----------------------------------------------------------------------------
 st.subheader("📈 Insights Visuales")
 
@@ -585,7 +594,6 @@ col_g1, col_g2 = st.columns(2)
 with col_g1:
     st.markdown("**Deals Posteriores por Unidad Destino**")
     if not df_post_f_unique.empty:
-        # Agrupación solo por unidad, sin moneda
         deals_u = df_post_f_unique.groupby("deal_unidad_norm")["deal_id"].nunique().reset_index(name="count").sort_values("count", ascending=False)
         fig_ins1 = px.bar(
             deals_u, x="deal_unidad_norm", y="count", 
@@ -618,7 +626,6 @@ st.markdown("---")
 # -----------------------------------------------------------------------------
 st.subheader("🗺️ Origen Geográfico de Leads (Por Ciudad)")
 
-# Diccionario manual de coordenadas
 city_coords = {
     "Ciudad de México": [19.4326, -99.1332],
     "CDMX": [19.4326, -99.1332],
@@ -641,43 +648,32 @@ city_coords = {
 }
 
 if not df.empty and "Contact_Ciudad" in df.columns:
-    # Filtramos leads con ciudad válida
     df_geo = df[df["Contact_Ciudad"].isin(city_coords.keys())].copy()
-    
     if not df_geo.empty:
-        # Agrupamos por ciudad
         geo_counts = df_geo["Contact_Ciudad"].value_counts().reset_index()
         geo_counts.columns = ["ciudad", "conteo"]
-        
-        # Asignamos lat/lon
         geo_counts["lat"] = geo_counts["ciudad"].map(lambda x: city_coords[x][0])
         geo_counts["lon"] = geo_counts["ciudad"].map(lambda x: city_coords[x][1])
         
         fig_map = px.scatter_mapbox(
-            geo_counts,
-            lat="lat",
-            lon="lon",
-            hover_name="ciudad",
-            hover_data={"conteo": True, "lat": False, "lon": False},
-            size="conteo",
-            color="conteo",
+            geo_counts, lat="lat", lon="lon",
+            hover_name="ciudad", hover_data={"conteo": True, "lat": False, "lon": False},
+            size="conteo", color="conteo",
             color_continuous_scale=px.colors.sequential.Plasma,
-            size_max=30,
-            zoom=3,
+            size_max=30, zoom=3,
             mapbox_style="carto-darkmatter"
         )
-        
         fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=500)
         st.plotly_chart(fig_map, use_container_width=True)
     else:
-        st.info("No hay datos geográficos suficientes para mostrar el mapa.")
+        st.info("No hay datos geográficos suficientes.")
 else:
     st.info("Columna de ciudad no disponible.")
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 15. SANKEY (MODIFICADO: ORIGEN POR CAMPAÑA/NEGOCIO)
+# 15. SANKEY (MEJORADO)
 # -----------------------------------------------------------------------------
 st.subheader("🔀 Flujo: Origen Campaña ➡ Unidad Destino")
 
@@ -687,7 +683,6 @@ if check_sankey_mkt:
     df_sankey = df_sankey[df_sankey["pipeline_marketing"] == "iNBest.marketing"]
 
 if not df_sankey.empty:
-    # AQUI ESTA EL CAMBIO: Usamos "Origen" en vez de "origen_origen_del_negocio"
     sankey_g = df_sankey.groupby(["Origen", "deal_unidad_norm"])["deal_id"].nunique().reset_index(name="value")
     
     all_sources = list(sankey_g["Origen"].unique())
@@ -717,7 +712,7 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 16. DESGLOSE (SOLO CONTEO DE DEALS - SIN MONTOS)
+# 16. DESGLOSE
 # -----------------------------------------------------------------------------
 st.subheader("📊 Desglose por pipeline y etapa comercial")
 
@@ -725,46 +720,28 @@ if df_post_f.empty:
     st.info("No hay datos posteriores con los filtros actuales.")
 else:
     col_t1, col_t2 = st.columns(2)
-
     with col_t1:
         st.markdown("**Top pipelines comerciales (por cantidad)**")
         top_pipelines = (
             df_post_f.groupby("pipeline_comercial")
-            .agg(
-                num_deals=("deal_id", "nunique"),
-            )
+            .agg(num_deals=("deal_id", "nunique"))
             .reset_index()
             .sort_values("num_deals", ascending=False)
         )
-        st.dataframe(
-            top_pipelines,
-            use_container_width=True,
-            hide_index=True,
-        )
+        st.dataframe(top_pipelines, use_container_width=True, hide_index=True)
 
     with col_t2:
         st.markdown("**Detalle de etapas dentro de un pipeline comercial**")
         pipelines_disp = sorted(df_post_f["pipeline_comercial"].unique())
-        pipeline_sel = st.selectbox(
-            "Selecciona pipeline comercial",
-            options=pipelines_disp,
-        )
-
-        df_etapas = df_post_f[df_post_f["pipeline_comercial"] == pipeline_sel]
-
-        etapas = (
-            df_etapas.groupby("etapa_comercial")
-            .agg(
-                num_deals=("deal_id", "nunique"),
+        if pipelines_disp:
+            pipeline_sel = st.selectbox("Selecciona pipeline comercial", options=pipelines_disp)
+            df_etapas = df_post_f[df_post_f["pipeline_comercial"] == pipeline_sel]
+            etapas = (
+                df_etapas.groupby("etapa_comercial")
+                .agg(num_deals=("deal_id", "nunique"))
+                .reset_index()
+                .sort_values("num_deals", ascending=False)
             )
-            .reset_index()
-            .sort_values("num_deals", ascending=False)
-        )
-
-        st.dataframe(
-            etapas,
-            use_container_width=True,
-            hide_index=True,
-        )
+            st.dataframe(etapas, use_container_width=True, hide_index=True)
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
