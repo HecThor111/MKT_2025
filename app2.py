@@ -160,19 +160,18 @@ def display_kpi(label, value, sub_text=""):
     """
     st.markdown(html, unsafe_allow_html=True)
 
-# --- FUNCIÓN DE LIMPIEZA Y AGRUPACIÓN MEJORADA ---
+# --- FUNCIÓN DE LIMPIEZA MODIFICADA (FUSIÓN STEP IN & INNOVATE) ---
 def limpiar_origen_sankey(texto_origen):
     if not isinstance(texto_origen, str):
         return None
     
     txt = texto_origen.lower().strip()
     
-    # 1. FILTRO: Eliminar leads genéricos que no tienen campaña específica
-    # Si el texto extraído es exactamente "lead de aws" significa que no hubo texto después del guion.
+    # 1. FILTRO: Eliminar leads genéricos
     if txt == "lead de aws":
         return None
 
-    # 2. AGRUPACIÓN DE EVENTOS SIMILARES
+    # 2. AGRUPACIÓN DE EVENTOS
     
     # Modernización (Online y Presencial agrupados)
     if "modernización" in txt and "infraestructura" in txt:
@@ -182,15 +181,14 @@ def limpiar_origen_sankey(texto_origen):
     if "driven" in txt:
         return "Eventos Driven"
     
-    # Step In & Innovate (Workshops agrupados)
+    # --- CAMBIO AQUI: Fusionar Agnostico y Step In & Innovate en uno solo ---
+    if "agnostico" in txt or "agnóstico" in txt:
+        return "Step In & Innovate Workshops"
+    
     if "step in & innovate" in txt:
         return "Step In & Innovate Workshops"
 
-    # Regla específica anterior
-    if "agnostico" in txt or "agnóstico" in txt:
-        return "Step In & Innovate: Workshop de Inteligencia Artificial"
-
-    # 3. Retornar texto original si no cae en grupos
+    # 3. Retornar texto original si no cae en grupos (truncado)
     return texto_origen[:50] + "..." if len(texto_origen) > 50 else texto_origen
 
 # -----------------------------------------------------------------------------
@@ -278,7 +276,7 @@ def load_data(path: str) -> pd.DataFrame:
         lambda row: normalizar_unidad(row["origen_unidad_raw"], row["pipeline_marketing"]), axis=1
     )
     df["deal_unidad_norm"] = df.apply(
-        lambda row: normalizar_unidad(row["deal_unidad_raw"], row["pipeline_comercial"]), axis=1
+        lambda row: normalizar_unidad(row["deal_unidad_raw"], row["deal_pipeline_label"]), axis=1
     )
 
     # Rellenar textos clave
