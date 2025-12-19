@@ -160,34 +160,22 @@ def display_kpi(label, value, sub_text=""):
     """
     st.markdown(html, unsafe_allow_html=True)
 
-# FUNCIÓN NUEVA: LIMPIEZA INTELIGENTE PARA SANKEY
+# FUNCIÓN DE LIMPIEZA MODIFICADA (SIN AGRUPACIONES GENÉRICAS)
 def limpiar_origen_sankey(texto_origen):
     if not isinstance(texto_origen, str):
         return "Desconocido"
     
     txt = texto_origen.lower().strip()
     
-    # Agrupaciones lógicas
-    if "google" in txt or "adwords" in txt or "search" in txt:
-        return "Google Ads"
-    if "facebook" in txt or "fb" in txt or "meta" in txt:
-        return "Facebook/Meta"
-    if "instagram" in txt or "ig" in txt:
-        return "Instagram"
-    if "linkedin" in txt:
-        return "LinkedIn"
-    if "web" in txt or "directo" in txt or "orgánico" in txt or "pagina" in txt:
-        return "Sitio Web / Orgánico"
-    if "mail" in txt or "correo" in txt or "newsletter" in txt:
-        return "Email Marketing"
-    if "evento" in txt or "event" in txt or "webinar" in txt:
-        return "Eventos / Webinars"
-    if "referido" in txt or "partner" in txt or "alianza" in txt:
-        return "Referidos / Partners"
-    if "base instalada" in txt or "cross" in txt or "up" in txt:
-        return "Base Instalada"
+    # 1. Regla específica solicitada
+    if "agnostico" in txt or "agnóstico" in txt:
+        return "Step In & Innovate: Workshop de Inteligencia Artificial"
+
+    # 2. Eliminadas las reglas de agrupación (Google, Facebook, LinkedIn, etc.)
+    # Se devuelve el texto original para mostrar el nombre real de la campaña/origen.
     
-    return texto_origen[:25] + "..." if len(texto_origen) > 25 else texto_origen
+    # Solo truncamos si es excesivamente largo para no romper la gráfica
+    return texto_origen[:50] + "..." if len(texto_origen) > 50 else texto_origen
 
 # -----------------------------------------------------------------------------
 # 3. CARGA Y PROCESAMIENTO
@@ -208,20 +196,28 @@ def load_data(path: str) -> pd.DataFrame:
         if col in df.columns:
             df[col] = df[col].replace("Localizando", "Acercamiento", regex=True)
 
-    # --- Cálculo de columna "Origen" MEJORADO ---
+    # --- Cálculo de columna "Origen" MEJORADO (Split por guion) ---
     def calcular_origen(val):
         s_val = str(val)
         if "-" not in s_val:
             return s_val.strip()
+        
+        # Dividir por guiones
         parts = [p.strip() for p in s_val.split("-")]
+        
+        # Lista de palabras a ignorar si están al final (locations, generic terms)
         ignore_list = [
             "GDL", "CDMX", "MX", "USA", "LATAM", "MTY", "Bajio", "Occidente", 
             "Agnostico", "Upselling", "Crosselling", "Base Instalada", 
             "General", "Página Web"
         ]
+        
         candidate = parts[-1]
+        
+        # Si la última parte está en la lista negra y hay más partes, tomamos la penúltima
         if candidate in ignore_list and len(parts) > 1:
             return parts[-2]
+        
         return candidate
     
     if "origen_deal_name" in df.columns:
@@ -666,11 +662,10 @@ with col_g2:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 16. MAPA INTERACTIVO DE CIUDADES (MODIFICADO Y UNIFICADO)
+# 16. MAPA INTERACTIVO DE CIUDADES
 # -----------------------------------------------------------------------------
 st.subheader("🗺️ Origen Geográfico de Leads (Por Ciudad)")
 
-# Solo las llaves canónicas (nombres oficiales unificados)
 CITY_COORDS = {
     "Ciudad de México": [19.4326, -99.1332],
     "Estado de México": [19.3582, -99.6453],
@@ -685,54 +680,30 @@ CITY_COORDS = {
 }
 
 def normalizar_ciudad_mapa(nombre):
-    """
-    Toma cualquier variación del nombre de la ciudad y retorna la versión estándar.
-    """
     n = str(nombre).lower().strip()
-    
-    # Ciudad de México y Delegaciones
     if n in ['cdmx', 'ciudad de mexico', 'ciudad de méxico', 'cuauthemoc', 'tlalpan', 'benito juarez', 'miguel hidalgo', 'coyoacan']:
         return 'Ciudad de México'
-    
-    # Guadalajara y Zona Metro
     if n in ['gdl', 'guadalajara', 'zapopan', 'tlaquepaque']:
         return 'Guadalajara'
-    
-    # Monterrey y Zona Metro
     if n in ['monterrey', 'mty', 'san pedro garza garcia', 'san pedro']:
         return 'Monterrey'
-    
-    # León
     if 'león' in n or 'leon' in n:
         return 'León'
-    
-    # Estado de México / Naucalpan
     if 'estado de' in n or 'naucalpan' in n or 'tlalnepantla' in n:
         return 'Estado de México'
-    
-    # Mérida
     if 'merida' in n or 'mérida' in n:
         return 'Mérida'
-    
-    # San Jose
     if 'san jose' in n or 'san josé' in n:
         return 'San Jose'
-        
-    return nombre # Retornar original si no hay match
+    return nombre
 
 if not df.empty and "Contact_Ciudad" in df.columns:
-    # 1. Creamos columna temporal normalizada
     df["Ciudad_Norm"] = df["Contact_Ciudad"].apply(normalizar_ciudad_mapa)
-    
-    # 2. Filtramos solo las que están en nuestro diccionario de coordenadas
     df_geo = df[df["Ciudad_Norm"].isin(CITY_COORDS.keys())].copy()
     
     if not df_geo.empty:
-        # 3. Agrupamos por la ciudad NORMALIZADA
         geo_counts = df_geo["Ciudad_Norm"].value_counts().reset_index()
         geo_counts.columns = ["ciudad", "conteo"]
-        
-        # 4. Asignamos coordenadas basándonos en el nombre unificado
         geo_counts["lat"] = geo_counts["ciudad"].map(lambda x: CITY_COORDS[x][0])
         geo_counts["lon"] = geo_counts["ciudad"].map(lambda x: CITY_COORDS[x][1])
         
