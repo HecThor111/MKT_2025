@@ -160,21 +160,37 @@ def display_kpi(label, value, sub_text=""):
     """
     st.markdown(html, unsafe_allow_html=True)
 
-# FUNCIÓN DE LIMPIEZA MODIFICADA (SIN AGRUPACIONES GENÉRICAS)
+# --- FUNCIÓN DE LIMPIEZA Y AGRUPACIÓN MEJORADA ---
 def limpiar_origen_sankey(texto_origen):
     if not isinstance(texto_origen, str):
-        return "Desconocido"
+        return None
     
     txt = texto_origen.lower().strip()
     
-    # 1. Regla específica solicitada
+    # 1. FILTRO: Eliminar leads genéricos que no tienen campaña específica
+    # Si el texto extraído es exactamente "lead de aws" significa que no hubo texto después del guion.
+    if txt == "lead de aws":
+        return None
+
+    # 2. AGRUPACIÓN DE EVENTOS SIMILARES
+    
+    # Modernización (Online y Presencial agrupados)
+    if "modernización" in txt and "infraestructura" in txt:
+        return "Modernización Infraestructura AWS"
+    
+    # Eventos Driven (MSFT, AWS, Fabric, MTY agrupados)
+    if "driven" in txt:
+        return "Eventos Driven"
+    
+    # Step In & Innovate (Workshops agrupados)
+    if "step in & innovate" in txt:
+        return "Step In & Innovate Workshops"
+
+    # Regla específica anterior
     if "agnostico" in txt or "agnóstico" in txt:
         return "Step In & Innovate: Workshop de Inteligencia Artificial"
 
-    # 2. Eliminadas las reglas de agrupación (Google, Facebook, LinkedIn, etc.)
-    # Se devuelve el texto original para mostrar el nombre real de la campaña/origen.
-    
-    # Solo truncamos si es excesivamente largo para no romper la gráfica
+    # 3. Retornar texto original si no cae en grupos
     return texto_origen[:50] + "..." if len(texto_origen) > 50 else texto_origen
 
 # -----------------------------------------------------------------------------
@@ -205,7 +221,7 @@ def load_data(path: str) -> pd.DataFrame:
         # Dividir por guiones
         parts = [p.strip() for p in s_val.split("-")]
         
-        # Lista de palabras a ignorar si están al final (locations, generic terms)
+        # Lista de palabras a ignorar si están al final
         ignore_list = [
             "GDL", "CDMX", "MX", "USA", "LATAM", "MTY", "Bajio", "Occidente", 
             "Agnostico", "Upselling", "Crosselling", "Base Instalada", 
@@ -725,7 +741,7 @@ else:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 17. SANKEY
+# 17. SANKEY (MEJORADO CON AGRUPACIÓN Y FILTRO)
 # -----------------------------------------------------------------------------
 st.subheader("🔀 Flujo: Origen Campaña ➡ Unidad Destino")
 
@@ -736,6 +752,9 @@ if check_sankey_mkt:
 
 if not df_sankey.empty:
     df_sankey["Origen_Clean"] = df_sankey["Origen"].apply(limpiar_origen_sankey)
+
+    # --- FILTRO IMPORTANTE: Eliminar los que devolvieron None (como "Lead de AWS") ---
+    df_sankey = df_sankey.dropna(subset=["Origen_Clean"])
 
     sankey_g = df_sankey.groupby(["Origen_Clean", "deal_unidad_norm"])["deal_id"].nunique().reset_index(name="value")
     
