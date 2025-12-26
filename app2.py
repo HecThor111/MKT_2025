@@ -577,37 +577,34 @@ with col_graph_1:
         # --- FILTRO: ELIMINA 'Lead' y 'Acercamiento' SI LO DESEAS ---
         etapa_counts = etapa_counts[~etapa_counts["etapa_marketing"].isin(["Acercamiento", "Lead", "lead"])]
         
-        # --- LÓGICA DE COLORES PERSONALIZADA ---
-        COLOR_WON = "#22d3ee"   # Turquesa Vibrante (Ganados)
-        COLOR_LOST = "#8b5cf6"  # Morado (Perdidos/Descartados)
-        PALETTE_BLUES = ["#38bdf8", "#0ea5e9", "#60a5fa", "#93c5fd"] # Solo Azules
+        # --- LÓGICA DE COLORES PERSONALIZADA (PETICIÓN USUARIO) ---
+        # 1. El Turquesa vibrante para GANADOS
+        color_ganado = "#22d3ee" 
+        # 2. Paleta de Azules y Morados para el resto (SIN ROSAS)
+        palette_others = ["#38bdf8", "#0ea5e9", "#6366f1", "#8b5cf6", "#818cf8"]
         
+        # Creamos un mapa de colores explícito
         color_map_funnel = {}
         unique_stages = etapa_counts["etapa_marketing"].unique()
         
-        blue_idx = 0
-        for stage in unique_stages:
+        for i, stage in enumerate(unique_stages):
             s_lower = stage.lower()
-            
-            # 1. GANADOS -> Turquesa
-            if any(x in s_lower for x in ["ganad", "won", "cierre", "cliente"]):
-                color_map_funnel[stage] = COLOR_WON
-            
-            # 2. PERDIDOS / DESCARTADOS -> Morado (Para diferenciar bien)
-            elif any(x in s_lower for x in ["perdid", "lost", "descart"]):
-                color_map_funnel[stage] = COLOR_LOST
-            
-            # 3. RESTO (MQL, SQL, Nutrición) -> Azules
+            # Si es Ganado -> Turquesa
+            if "ganad" in s_lower or "won" in s_lower or "cierre" in s_lower or "cliente" in s_lower:
+                color_map_funnel[stage] = color_ganado
+            # Si es Perdido -> Un morado/azul fuerte (o lo que prefieras)
+            elif "perdid" in s_lower or "lost" in s_lower:
+                color_map_funnel[stage] = "#6366f1" # Indigo
             else:
-                color_map_funnel[stage] = PALETTE_BLUES[blue_idx % len(PALETTE_BLUES)]
-                blue_idx += 1
+                # El resto (MQL, SQL, etc) -> Ciclo de azules
+                color_map_funnel[stage] = palette_others[i % len(palette_others)]
 
         fig_etapas = px.funnel(
             etapa_counts, 
             y="etapa_marketing", 
             x="num_deals",
             color="etapa_marketing", # Importante: Colorear por etapa
-            color_discrete_map=color_map_funnel # Aplicamos nuestro mapa personalizado
+            color_discrete_map=color_map_funnel # Usamos nuestro mapa personalizado
         )
         fig_etapas.update_traces(textinfo="value+percent initial")
         fig_etapas.update_layout(
@@ -938,6 +935,7 @@ else:
             st.dataframe(etapas, use_container_width=True, hide_index=True)
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
+
 
 
 
