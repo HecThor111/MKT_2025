@@ -181,7 +181,7 @@ def limpiar_origen_sankey(texto_origen):
     if "driven" in txt:
         return "Eventos Driven"
     
-    # --- CAMBIO AQUI: Fusionar Agnostico y Step In & Innovate en uno solo ---
+    # --- Fusionar Agnostico y Step In & Innovate en uno solo ---
     if "agnostico" in txt or "agnóstico" in txt:
         return "Step In & Innovate Workshops"
     
@@ -445,25 +445,100 @@ with c_type3: display_kpi("Renovaciones", f"{count_renewals}", "Renewals")
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 9. FILA 5: FINANZAS (PLACEHOLDERS)
+# 9. FILA 5: FINANZAS ACTUALIZADO
 # -----------------------------------------------------------------------------
 st.subheader("💰 Métricas Financieras y ROI")
 
-costo_eventos = 0
+# --- VALORES MANUALES ACTUALIZADOS ---
+costo_eventos = 0 # Placeholder por compatibilidad si se necesitara calcular
 costo_campanas = 0
-cac_val = 0
-roi_val = 0
+cpl_val = "$95,92"
+cac_val = "$1.932,95"
+roi_val = "744,1%"
 
-c_fin1, c_fin2, c_fin3, c_fin4 = st.columns(4)
-val_evt = f"${costo_eventos:,.2f}" if costo_eventos > 0 else "$ --"
-val_cmp = f"${costo_campanas:,.2f}" if costo_campanas > 0 else "$ --"
-val_cac = f"${cac_val:,.2f}" if cac_val > 0 else "$ --"
-val_roi = f"{roi_val}%" if roi_val > 0 else "-- %"
+# Sección superior: ROI y CAC Global
+c_fin1, c_fin2, c_fin3 = st.columns(3)
 
-with c_fin1: display_kpi("$ Eventos", val_evt, "Inversión")
-with c_fin2: display_kpi("$ Campañas", val_cmp, "Inversión")
-with c_fin3: display_kpi("CAC", val_cac, "Costo Adq. Cliente")
-with c_fin4: display_kpi("ROI", val_roi, "Retorno Inversión")
+with c_fin1: display_kpi("CPL (Cost Per Lead)", cpl_val, "Global")
+with c_fin2: display_kpi("CAC", cac_val, "Costo Adq. Cliente")
+with c_fin3: display_kpi("ROI", roi_val, "Retorno Inversión")
+
+st.markdown("#### 📉 Sección: Gastos")
+
+gastos_mkt = "$63.787,35"
+gasto_prop_evento = "$2.039,05"
+gasto_prop_campana = "$2.970,03"
+gasto_prop_webinar = "$0.0"
+
+c_gasto1, c_gasto2, c_gasto3, c_gasto4 = st.columns(4)
+
+with c_gasto1: display_kpi("Gastos Mkt", gastos_mkt, "Total")
+with c_gasto2: display_kpi("Gasto Prop x Evento", gasto_prop_evento, "Promedio")
+with c_gasto3: display_kpi("Gasto Prop x Campaña", gasto_prop_campana, "Promedio")
+with c_gasto4: display_kpi("Gasto Prop x Webinar", gasto_prop_webinar, "Promedio")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 9.1 RESUMEN POR CATEGORIA
+# -----------------------------------------------------------------------------
+st.subheader("📑 Resumen por Categoría")
+
+data_cat = {
+    "Categoría": ["Eventos", "Campañas", "Webinars"],
+    "Leads": [468, 100, 97],
+    "Cost": ["$48.937,20", "$14.850,15", "$-"],
+    "Won $": ["$298.369,58", "$66.320,55", "$135.855,65"],
+    "CPL": ["$104,57", "$148,50", "$-"],
+    "CAC": ["$2.039,05", "$7.425,08", "$-"],
+    "G. Prom leads": ["$12.432,07", "$33.160,28", "$19.407,95"],
+    "Won %": ["245%", "22%", "77%"]
+}
+
+df_cat = pd.DataFrame(data_cat)
+st.dataframe(df_cat, use_container_width=True, hide_index=True)
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 9.2 CONVERSIÓN DETALLADA
+# -----------------------------------------------------------------------------
+st.subheader("📊 Conversión por Eventos / Campaña / Webinar")
+
+# Construcción manual de la tabla con los datos proporcionados
+data_det = [
+    ["Acuna", "Campaña", "3", "$-", "3", "$-", "25", "$5.000,00", "$200,00", "$-", "$-", "0%", "-100%"],
+    ["Data-Driven AWS CDMX", "Evento", "3", "$112.001,52", "$-", "$-", "10", "$1.083,50", "$108,35", "$361,17", "$37.333,84", "30%", "10237%"],
+    ["Data-Driven AWS GDL", "Evento", "3", "$11.885,40", "$-", "$-", "18", "$1.250,00", "$69,44", "$416,67", "$3.961,80", "17%", "851%"],
+    ["Data-Driven MSFT CDMX", "Evento", "1", "$-", "$-", "6", "$1.083,50", "$180,58", "$-", "$-", "0%", "-100%", ""], # Ajuste longitud
+    ["Data-Driven MSFT GDL", "Evento", "1", "$735,40", "$-", "$-", "14", "$1,00", "$0,07", "$1,00", "$735,40", "7%", "73440%"],
+    ["Data-Driven MSFT MTY", "Evento", "3", "$7.285,92", "1", "1", "17", "$1.500,00", "$88,24", "$1.500,00", "$7.285,92", "6%", "386%"],
+    ["DPL Protección Inteligente de Datos", "Evento", "6", "$7.102,16", "4", "$16.637,50", "1", "$-", "17", "$1.300,00", "$76,47", "$650,00", "$3.551,08"],
+    ["Modernización de Infraestructura AWS (ONLINE)", "Webinar", "3", "$49.151,00", "1", "$-", "$-", "33", "$1,00", "$0,03", "$0,50", "$24.575,50", "6%"],
+    ["Modernización de Infraestructura AWS (PRESENCIAL)", "Evento", "5", "$90.151,68", "$-", "$-", "20", "$1,00", "$0,05", "$0,20", "$18.030,34", "25%", "9015068%"],
+    ["Orgánico", "Campaña", "18", "$66.320,55", "5", "1", "197", "$1.500,00", "$15,46", "$750,00", "$33.160,28", "2%", "4321%"],
+    ["Padel Tech Connect", "Evento", "1", "$-", "1", "$-", "$-", "59", "$1.000,00", "$16,95", "$-", "$-", "0%"],
+    ["Ruta Tequila", "Evento", "1", "$-", "1", "$-", "$-", "24", "$5.000,00", "$208,33", "$-", "$-", "0%"],
+    ["Seguridad con Microsoft 365 y Copilot", "Evento", "3", "$5.852,01", "$-", "$-", "13", "$5.000,00", "$384,62", "$1.666,67", "$1.950,67", "23%", "17%"],
+    ["Smart City Expo", "Evento", "3", "$19.852,85", "$-", "2", "$-", "35", "$10.000,00", "$285,71", "$10.000,00", "$19.852,85", "3%"],
+    ["Step In & Innovate: Workshop (León)", "Evento", "8", "$69.396,00", "4", "$-", "$-", "26", "$2.253,70", "$86,68", "$563,43", "$17.349,00", "15%"],
+    ["Step In & Innovate: Workshop Morelia", "Evento", "1", "$12.000,00", "$-", "$-", "25", "$750,00", "$30,00", "$750,00", "$12.000,00", "4%", "1500%"],
+    ["Webinar Data-Driven MSFT", "Webinar", "9", "$86.700,75", "1", "$-", "3", "$-", "64", "$1,00", "$0,02", "$0,20", "$17.340,15"],
+    ["TOTALES", "", "72", "$538.435,24", "22", "$16.637,50", "18", "$-", "503", "$36.724,70", "$103,00", "$979,99", "$11.595,70"]
+]
+
+# Normalizamos longitudes de filas para evitar errores en DataFrame
+max_len = 13
+data_norm = []
+for row in data_det:
+    if len(row) < max_len:
+        row = row + [""] * (max_len - len(row))
+    data_norm.append(row[:max_len])
+
+cols_det = ["Fuente", "Type", "Leads (Won)", "Ganados $", "SQL", "MQL", "Leads Total", "Costo", "CPL", "CAC", "Ganancia Prom", "% Conv", "ROI"]
+df_det = pd.DataFrame(data_norm, columns=cols_det)
+
+st.dataframe(df_det, use_container_width=True, hide_index=True)
 
 st.markdown("---")
 
