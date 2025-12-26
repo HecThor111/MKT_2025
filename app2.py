@@ -389,7 +389,7 @@ with st.expander("🔍 Ver Detalle de Deals Ganados (Ventas)"):
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 7. FILA 3: NEGOCIOS POSTERIORES
+# 7. FILA 3: NEGOCIOS POSTERIORES (MODIFICADO - 3 COLUMNAS)
 # -----------------------------------------------------------------------------
 st.subheader("🎯 Negocios Posteriores (Abiertos y Perdidos)")
 
@@ -399,13 +399,14 @@ post_perdidos = df_post_f_unique[df_post_f_unique["estado_comercial"] == "Perdid
 abiertos_count = len(post_abiertos)
 abiertos_amount = post_abiertos["deal_amount"].sum()
 perdidos_count = len(post_perdidos)
+# perdidos_amount no se muestra, pero se calcula si fuera necesario
 perdidos_amount = post_perdidos["deal_amount"].sum()
 
-c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
+# Cambio a 3 columnas para eliminar KPI de monto perdido
+c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
 with c_kpi1: display_kpi("Negocios Abiertos", f"{abiertos_count}", "Pipeline Comercial")
 with c_kpi2: display_kpi("Monto Abierto (USD)", f"${abiertos_amount:,.2f}", "Potencial Activo")
 with c_kpi3: display_kpi("Negocios Perdidos", f"{perdidos_count}", "Cierre Perdido")
-with c_kpi4: display_kpi("Monto Perdido (USD)", f"${perdidos_amount:,.2f}", "No Concretado")
 
 with st.expander("🔍 Ver Detalle de Negocios (Abiertos y Perdidos)"):
     cols_show = ["deal_name", "Origen", "Contact_Nombre_Completo", "Contact_Empresa", "deal_dealtype", "etapa_comercial", "deal_amount", "estado_comercial"]
@@ -510,7 +511,7 @@ data_det = [
     ["Acuna", "Campaña", "3", "$-", "3", "$-", "25", "$5.000,00", "$200,00", "$-", "$-", "0%", "-100%"],
     ["Data-Driven AWS CDMX", "Evento", "3", "$112.001,52", "$-", "$-", "10", "$1.083,50", "$108,35", "$361,17", "$37.333,84", "30%", "10237%"],
     ["Data-Driven AWS GDL", "Evento", "3", "$11.885,40", "$-", "$-", "18", "$1.250,00", "$69,44", "$416,67", "$3.961,80", "17%", "851%"],
-    ["Data-Driven MSFT CDMX", "Evento", "1", "$-", "$-", "6", "$1.083,50", "$180,58", "$-", "$-", "0%", "-100%", ""], # Ajuste longitud
+    ["Data-Driven MSFT CDMX", "Evento", "1", "$-", "$-", "6", "$1.083,50", "$180,58", "$-", "$-", "0%", "-100%", ""], 
     ["Data-Driven MSFT GDL", "Evento", "1", "$735,40", "$-", "$-", "14", "$1,00", "$0,07", "$1,00", "$735,40", "7%", "73440%"],
     ["Data-Driven MSFT MTY", "Evento", "3", "$7.285,92", "1", "1", "17", "$1.500,00", "$88,24", "$1.500,00", "$7.285,92", "6%", "386%"],
     ["DPL Protección Inteligente de Datos", "Evento", "6", "$7.102,16", "4", "$16.637,50", "1", "$-", "17", "$1.300,00", "$76,47", "$650,00", "$3.551,08"],
@@ -538,12 +539,26 @@ for row in data_det:
 cols_det = ["Fuente", "Type", "Leads (Won)", "Ganados $", "SQL", "MQL", "Leads Total", "Costo", "CPL", "CAC", "Ganancia Prom", "% Conv", "ROI"]
 df_det = pd.DataFrame(data_norm, columns=cols_det)
 
-st.dataframe(df_det, use_container_width=True, hide_index=True)
+# --- FUNCIÓN DE ESTILO PARA RESALTAR TOTALES ---
+def highlight_totals(row):
+    # Verificamos si la primera columna es 'TOTALES'
+    if row["Fuente"] == "TOTALES":
+        # Retornamos un estilo gris oscuro/azulado (tipo header) y texto en negrita
+        return ['background-color: #1f2937; color: #ffffff; font-weight: bold; border-top: 2px solid #38bdf8'] * len(row)
+    else:
+        return [''] * len(row)
+
+# Aplicamos el estilo y mostramos
+st.dataframe(
+    df_det.style.apply(highlight_totals, axis=1),
+    use_container_width=True,
+    hide_index=True
+)
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 10. GRÁFICAS: FUNNEL MKT + DEAL TYPE
+# 10. GRÁFICAS: FUNNEL MKT + DEAL TYPE (MODIFICADO)
 # -----------------------------------------------------------------------------
 st.markdown("### 🧬 Análisis de Etapas y Tipos")
 
@@ -552,14 +567,30 @@ col_graph_1, col_graph_2 = st.columns(2)
 with col_graph_1:
     st.markdown("**Embudo de Marketing (Funnel)**")
     if not df_origen_f.empty:
+        # --- MODIFICACIÓN: FILTRO Y ORDENAMIENTO LÓGICO ---
+        # 1. Definir el orden específico solicitado
+        orden_logico = ["Acercamiento", "MQL", "SQL", "Perdido", "Ganado"]
+        
+        # 2. Filtrar Leads y Descartados (y mantener lo que coincida con el orden o sea relevante)
+        # Nota: "Acercamiento" proviene del renombrado de "Localizando" en load_data
+        df_funnel = df_origen_f[~df_origen_f["etapa_marketing"].isin(["Descartado", "Lead", "Leads", "Desconocido"])]
+        
+        # 3. Agrupar
         etapa_counts = (
-            df_origen_f.groupby("etapa_marketing")["origen_deal_id"]
+            df_funnel.groupby("etapa_marketing")["origen_deal_id"]
             .nunique()
             .reset_index(name="num_deals")
-            .sort_values("num_deals", ascending=False)
         )
-        etapa_counts = etapa_counts[etapa_counts["etapa_marketing"] != "Acercamiento"]
         
+        # 4. Forzar el ordenamiento lógico (no por cantidad)
+        etapa_counts["etapa_marketing"] = pd.Categorical(
+            etapa_counts["etapa_marketing"], 
+            categories=orden_logico, 
+            ordered=True
+        )
+        etapa_counts = etapa_counts.sort_values("etapa_marketing")
+        
+        # 5. Graficar
         fig_etapas = px.funnel(
             etapa_counts, 
             y="etapa_marketing", 
