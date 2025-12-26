@@ -603,7 +603,7 @@ with col_graph_1:
         fig_etapas = go.Figure(go.Funnel(
             y = etapa_counts["etapa_marketing"],
             x = etapa_counts["num_deals"],
-            textinfo = "value+percent initial", # Ahora sí calcula el % respecto al inicial correctamente
+            textinfo = "value+percent total", # <--- CORRECCIÓN AQUÍ: Calcula el % sobre el total de las etapas visibles
             marker = {"color": lista_colores},  # Aplicamos los colores personalizados aquí
             textposition = "inside",
             connector = {"line": {"color": "#6366f1", "width": 1}}
@@ -937,3 +937,4 @@ else:
             st.dataframe(etapas, use_container_width=True, hide_index=True)
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
+
