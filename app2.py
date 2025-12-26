@@ -558,7 +558,7 @@ st.dataframe(
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 10. GRÁFICAS: FUNNEL MKT + DEAL TYPE (COLORES EDITADOS)
+# 10. GRÁFICAS: FUNNEL MKT + DEAL TYPE (CORREGIDO PARA CÁLCULO DE %)
 # -----------------------------------------------------------------------------
 st.markdown("### 🧬 Análisis de Etapas y Tipos")
 
@@ -577,36 +577,38 @@ with col_graph_1:
         # --- FILTRO: ELIMINA 'Lead' y 'Acercamiento' SI LO DESEAS ---
         etapa_counts = etapa_counts[~etapa_counts["etapa_marketing"].isin(["Acercamiento", "Lead", "lead"])]
         
-        # --- LÓGICA DE COLORES PERSONALIZADA (PETICIÓN USUARIO) ---
+        # --- LÓGICA DE COLORES PERSONALIZADA ---
         # 1. El Turquesa vibrante para GANADOS
         color_ganado = "#22d3ee" 
-        # 2. Paleta de Azules y Morados para el resto (SIN ROSAS)
+        # 2. Paleta de Azules y Morados para el resto
         palette_others = ["#38bdf8", "#0ea5e9", "#6366f1", "#8b5cf6", "#818cf8"]
         
-        # Creamos un mapa de colores explícito
+        # Mapa de colores para construir la lista de colores ordenada
         color_map_funnel = {}
         unique_stages = etapa_counts["etapa_marketing"].unique()
         
         for i, stage in enumerate(unique_stages):
             s_lower = stage.lower()
-            # Si es Ganado -> Turquesa
             if "ganad" in s_lower or "won" in s_lower or "cierre" in s_lower or "cliente" in s_lower:
                 color_map_funnel[stage] = color_ganado
-            # Si es Perdido -> Un morado/azul fuerte (o lo que prefieras)
             elif "perdid" in s_lower or "lost" in s_lower:
                 color_map_funnel[stage] = "#6366f1" # Indigo
             else:
-                # El resto (MQL, SQL, etc) -> Ciclo de azules
                 color_map_funnel[stage] = palette_others[i % len(palette_others)]
 
-        fig_etapas = px.funnel(
-            etapa_counts, 
-            y="etapa_marketing", 
-            x="num_deals",
-            color="etapa_marketing", # Importante: Colorear por etapa
-            color_discrete_map=color_map_funnel # Usamos nuestro mapa personalizado
-        )
-        fig_etapas.update_traces(textinfo="value+percent initial")
+        # --- CORRECCIÓN: USAR GRAPH_OBJECTS PARA CÁLCULO CORRECTO DE % ---
+        # Creamos una lista de colores que coincida con el orden de los datos
+        lista_colores = [color_map_funnel.get(x, "#38bdf8") for x in etapa_counts["etapa_marketing"]]
+
+        fig_etapas = go.Figure(go.Funnel(
+            y = etapa_counts["etapa_marketing"],
+            x = etapa_counts["num_deals"],
+            textinfo = "value+percent initial", # Ahora sí calcula el % respecto al inicial correctamente
+            marker = {"color": lista_colores},  # Aplicamos los colores personalizados aquí
+            textposition = "inside",
+            connector = {"line": {"color": "#6366f1", "width": 1}}
+        ))
+
         fig_etapas.update_layout(
             template="plotly_dark", 
             plot_bgcolor="rgba(0,0,0,0)",
@@ -935,8 +937,3 @@ else:
             st.dataframe(etapas, use_container_width=True, hide_index=True)
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
-
-
-
-
-
