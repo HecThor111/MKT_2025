@@ -558,7 +558,7 @@ st.dataframe(
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 10. GRÁFICAS: FUNNEL MKT + DEAL TYPE (CORREGIDO)
+# 10. GRÁFICAS: FUNNEL MKT + DEAL TYPE
 # -----------------------------------------------------------------------------
 st.markdown("### 🧬 Análisis de Etapas y Tipos")
 
@@ -567,59 +567,31 @@ col_graph_1, col_graph_2 = st.columns(2)
 with col_graph_1:
     st.markdown("**Embudo de Marketing (Funnel)**")
     if not df_origen_f.empty:
-        # 1. Definir el orden estricto solicitado
-        orden_logico = ["Localizando/Nutrición", "MQL", "SQL", "Perdidos", "Ganados"]
-        
-        # 2. Función local para normalizar CUALQUIER etapa a tus 5 categorías
-        def normalizar_para_funnel(texto):
-            t = str(texto).lower()
-            if "ganad" in t or "won" in t:
-                return "Ganados"
-            if "perdid" in t or "lost" in t:
-                return "Perdidos"
-            if "mql" in t:
-                return "MQL"
-            if "sql" in t:
-                return "SQL"
-            if "localiza" in t or "nutricion" in t or "nutrición" in t or "acercamiento" in t:
-                return "Localizando/Nutrición"
-            return "Otros" # Se filtrará después
-
-        # 3. Crear columna temporal normalizada
-        df_funnel = df_origen_f.copy()
-        df_funnel["Etapa_Funnel"] = df_funnel["etapa_marketing"].apply(normalizar_para_funnel)
-        
-        # 4. Filtrar solo las 5 categorías deseadas (Excluye 'Otros', 'Descartados', 'Leads')
-        df_funnel = df_funnel[df_funnel["Etapa_Funnel"].isin(orden_logico)]
-        
-        # 5. Agrupar
         etapa_counts = (
-            df_funnel.groupby("Etapa_Funnel")["origen_deal_id"]
+            df_origen_f.groupby("etapa_marketing")["origen_deal_id"]
             .nunique()
             .reset_index(name="num_deals")
+            .sort_values("num_deals", ascending=False)
         )
         
-        # 6. Forzar el ordenamiento lógico
-        etapa_counts["Etapa_Funnel"] = pd.Categorical(
-            etapa_counts["Etapa_Funnel"], 
-            categories=orden_logico, 
-            ordered=True
-        )
-        etapa_counts = etapa_counts.sort_values("Etapa_Funnel")
+        # --- MODIFICACIÓN: FILTRO ELIMINA 'Lead' y 'Acercamiento' ---
+        # Se asegura que la comparación sea insensible a mayúsculas si es necesario
+        etapa_counts = etapa_counts[~etapa_counts["etapa_marketing"].isin(["Acercamiento", "Lead", "lead"])]
         
-        # 7. Graficar
         fig_etapas = px.funnel(
             etapa_counts, 
-            y="Etapa_Funnel", 
+            y="etapa_marketing", 
             x="num_deals",
-            color_discrete_sequence=[COLOR_PALETTE[0]]
+            # --- MODIFICACIÓN: COLORES POR ETAPA ---
+            color="etapa_marketing",
+            color_discrete_sequence=COLOR_PALETTE
         )
         fig_etapas.update_traces(textinfo="value+percent initial")
         fig_etapas.update_layout(
             template="plotly_dark", 
             plot_bgcolor="rgba(0,0,0,0)",
             margin=dict(l=0, r=0, t=20, b=20),
-            yaxis_title=None
+            showlegend=False # Opcional: Ocultar leyenda para limpiar el funnel
         )
         st.plotly_chart(fig_etapas, use_container_width=True)
     else:
@@ -940,4 +912,3 @@ else:
             st.dataframe(etapas, use_container_width=True, hide_index=True)
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
-
