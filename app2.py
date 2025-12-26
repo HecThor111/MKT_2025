@@ -580,7 +580,7 @@ with col_graph_1:
         # --- LÓGICA DE COLORES PERSONALIZADA ---
         COLOR_WON = "#22d3ee"   # Turquesa Vibrante (Ganados)
         COLOR_LOST = "#8b5cf6"  # Morado (Perdidos/Descartados)
-        PALETTE_BLUES = ["#38bdf8", "#0ea5e9", "#60a5fa", "#93c5fd"] # Azules (En proceso)
+        PALETTE_BLUES = ["#38bdf8", "#0ea5e9", "#60a5fa", "#93c5fd"] # Solo Azules
         
         color_map_funnel = {}
         unique_stages = etapa_counts["etapa_marketing"].unique()
@@ -593,7 +593,7 @@ with col_graph_1:
             if any(x in s_lower for x in ["ganad", "won", "cierre", "cliente"]):
                 color_map_funnel[stage] = COLOR_WON
             
-            # 2. PERDIDOS / DESCARTADOS -> Morado
+            # 2. PERDIDOS / DESCARTADOS -> Morado (Para diferenciar bien)
             elif any(x in s_lower for x in ["perdid", "lost", "descart"]):
                 color_map_funnel[stage] = COLOR_LOST
             
@@ -607,7 +607,7 @@ with col_graph_1:
             y="etapa_marketing", 
             x="num_deals",
             color="etapa_marketing", # Importante: Colorear por etapa
-            color_discrete_map=color_map_funnel # Usamos nuestro mapa personalizado
+            color_discrete_map=color_map_funnel # Aplicamos nuestro mapa personalizado
         )
         fig_etapas.update_traces(textinfo="value+percent initial")
         fig_etapas.update_layout(
@@ -938,6 +938,7 @@ else:
             st.dataframe(etapas, use_container_width=True, hide_index=True)
 
 st.markdown("<br><br><div style='text-align: center; color: #475569;'>Desarrollado por Héctor Plascencia | 2025 🚀</div>", unsafe_allow_html=True)
+
 
 
 
